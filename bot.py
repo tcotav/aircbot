@@ -349,15 +349,16 @@ class AircBot(irc.bot.SingleServerIRCBot):
         if len(links) > 3:
             connection.privmsg(channel, f"... and {len(links) - 3} more links")
     
-    def handle_ask_command(self, connection, channel, user, question):
+    def handle_ask_command(self, connection, channel, user, question, show_thinking=True):
         """Handle !ask command - query the LLM with optional context"""
         if not self.llm_handler.is_enabled():
             connection.privmsg(channel, "❌ LLM is not available. Check configuration.")
             return
         
-        # Indicate we're thinking
-        thinking_msg = get_thinking_message(user, question[:100])
-        connection.privmsg(channel, thinking_msg)
+        # Indicate we're thinking (unless already shown)
+        if show_thinking:
+            thinking_msg = get_thinking_message(user, question[:100])
+            connection.privmsg(channel, thinking_msg)
         
         # Process in a separate thread to avoid blocking
         thread = Thread(target=self._process_ask_request, 
@@ -491,7 +492,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
                 # Treat it as an ask command
                 thinking_msg = get_thinking_message(user, clean_message[:100])
                 connection.privmsg(channel, thinking_msg)
-                self.handle_ask_command(connection, channel, user, clean_message)
+                self.handle_ask_command(connection, channel, user, clean_message, show_thinking=False)
         else:
             # Just a mention without a question - provide help
             responses = [

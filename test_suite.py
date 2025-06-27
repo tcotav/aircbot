@@ -14,6 +14,8 @@ from collections import defaultdict, deque
 # Add the project directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+from bot import AircBot
+
 # Import bot components
 from rate_limiter import RateLimiter
 
@@ -29,6 +31,7 @@ def run_all_tests():
     test_rate_limiter()
     test_bot_integration()
     test_llm_validation()
+    test_thinking_message_duplication()
     
     print("\n🎉 All tests completed!")
 
@@ -291,6 +294,46 @@ def test_llm_validation():
     print("✅ LLM validation: All tests passed")
     print()
 
+# ===== THINKING MESSAGE DUPLICATION TESTS =====
+
+def test_thinking_message_duplication():
+    """Test that thinking messages are not duplicated"""
+    print("🤔 Testing Thinking Message Duplication...")
+    
+    from unittest.mock import Mock
+    
+    # Create bot instance
+    bot = AircBot()
+    
+    # Mock connection
+    mock_connection = Mock()
+    mock_connection.privmsg = Mock()
+    
+    # Test 1: Normal ask command should show thinking message
+    mock_connection.privmsg.reset_mock()
+    bot.handle_ask_command(mock_connection, "#test", "user1", "test question")
+    
+    thinking_calls = [call for call in mock_connection.privmsg.call_args_list 
+                     if len(call[0]) > 1 and "🤔" in str(call[0][1])]
+    
+    if len(thinking_calls) != 1:
+        print(f"❌ Expected 1 thinking message, got {len(thinking_calls)}")
+        return False
+    
+    # Test 2: Ask command with show_thinking=False should not show thinking message
+    mock_connection.privmsg.reset_mock()
+    bot.handle_ask_command(mock_connection, "#test", "user1", "test question", show_thinking=False)
+    
+    thinking_calls = [call for call in mock_connection.privmsg.call_args_list 
+                     if len(call[0]) > 1 and "🤔" in str(call[0][1])]
+    
+    if len(thinking_calls) != 0:
+        print(f"❌ Expected 0 thinking messages, got {len(thinking_calls)}")
+        return False
+    
+    print("✅ Thinking message duplication: All tests passed")
+    return True
+
 # ===== COMPREHENSIVE FLOW TESTS =====
 
 def test_complete_flow():
@@ -372,3 +415,5 @@ if __name__ == "__main__":
         test_llm_validation()
     elif args.test == 'flow':
         test_complete_flow()
+    elif args.test == 'thinking':
+        test_thinking_message_duplication()
