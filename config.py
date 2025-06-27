@@ -17,6 +17,14 @@ class Config:
     IRC_USE_SSL = os.getenv('IRC_USE_SSL', 'false').lower() == 'true'
     IRC_SSL_VERIFY = os.getenv('IRC_SSL_VERIFY', 'true').lower() == 'true'
     
+    # LLM Settings (for Ollama with OpenAI-compatible API)
+    LLM_ENABLED = os.getenv('LLM_ENABLED', 'false').lower() == 'true'
+    LLM_BASE_URL = os.getenv('LLM_BASE_URL', 'http://localhost:11434/v1')
+    LLM_API_KEY = os.getenv('LLM_API_KEY', 'ollama')  # Ollama doesn't need a real key
+    LLM_MODEL = os.getenv('LLM_MODEL', 'llama3.2')
+    LLM_MAX_TOKENS = int(os.getenv('LLM_MAX_TOKENS', '500'))
+    LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.7'))
+    
     # Database
     DATABASE_PATH = os.getenv('DATABASE_PATH', 'data/links.db')
     

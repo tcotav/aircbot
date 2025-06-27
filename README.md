@@ -4,12 +4,15 @@ A simple IRC bot that automatically captures and saves links shared in channels.
 
 ## Features
 
-- Connects to IRC channels and monitors messages
-- Automatically detects and saves shared links
-- Fetches link metadata (title, description)
-- Stores links in SQLite database with deduplication
-- Provides commands to search and browse saved links
-- Simple memory system for conversation context
+- **Automatic Link Detection**: Connects to IRC channels and monitors messages for links
+- **Link Metadata**: Automatically fetches and stores link titles and descriptions  
+- **Smart Deduplication**: Avoids saving duplicate links
+- **Command Interface**: Traditional !commands for link management
+- **Natural Language**: Responds to natural mentions like "bubba, show me the links"
+- **LLM Integration**: Answers questions using locally hosted LLM (Ollama/OpenAI-compatible)
+- **SSL Support**: Connects to IRC servers with SSL (including self-signed certificates)
+- **Memory System**: Maintains conversation context for better LLM responses
+- **Robust Logging**: Detailed connection and error logging without channel spam
 
 ## Quick Start
 
@@ -44,19 +47,54 @@ A simple IRC bot that automatically captures and saves links shared in channels.
 
 Edit the `.env` file with your settings:
 
+### IRC Settings
 - `IRC_SERVER` - IRC server address (default: irc.libera.chat)
-- `IRC_PORT` - IRC server port (default: 6667)
+- `IRC_PORT` - IRC server port (default: 6667)  
 - `IRC_NICKNAME` - Bot's nickname
 - `IRC_CHANNEL` - Channel to join (include # prefix)
 - `IRC_PASSWORD` - Bot's password (if required)
+- `IRC_USE_SSL` - Enable SSL connection (true/false)
+- `IRC_SSL_VERIFY` - Verify SSL certificates (false for self-signed)
+
+### LLM Settings (for !ask command and mentions)
+- `LLM_ENABLED` - Enable LLM features (true/false)
+- `LLM_BASE_URL` - API endpoint (e.g., http://localhost:11434/v1 for Ollama)
+- `LLM_API_KEY` - API key (use "ollama" for local Ollama)
+- `LLM_MODEL` - Model name (e.g., deepseek-r1:latest)
+- `LLM_MAX_TOKENS` - Maximum response length (default: 150)
+- `LLM_TEMPERATURE` - Creativity level 0.0-1.0 (default: 0.7)
+
+### Database
 - `DATABASE_PATH` - Path to SQLite database file
 
 ## Commands
 
+### Traditional Commands
 - `!links` - Show recent links
-- `!links search <term>` - Search saved links
-- `!links stats` - Show statistics
+- `!links search <term>` - Search saved links by keyword
+- `!links by <user>` - Show links shared by specific user
+- `!links stats` - Show link statistics 
+- `!links details` - Show recent links with timestamps
+- `!ask <question>` - Ask the LLM a question
 - `!help` - Show help information
+
+### Natural Language (Bot Mentions)
+You can also mention the bot by name and ask naturally:
+
+**Link Requests:**
+- `bubba, show me the links` → Shows recent links
+- `aircbot what links do you have?` → Shows recent links  
+- `bot search for python links` → Searches for "python"
+- `bubba show me links by john` → Shows john's links
+- `aircbot links stats please` → Shows statistics
+- `bot show detailed links` → Shows links with timestamps
+
+**Questions:**
+- `bubba, what's the weather like?` → Asks LLM
+- `aircbot explain quantum physics` → Asks LLM
+- `bot, how does this work?` → Asks LLM
+
+The bot responds to: `bubba`, `aircbot`, `bot` (case-insensitive, with word boundaries)
 
 ## Database Schema
 
@@ -89,12 +127,14 @@ The bot is structured in modular components:
 
 ## Example Usage
 
-Once running, the bot will automatically save any links shared in the channel:
-
+### Automatic Link Saving
 ```
 <user> Check out this cool project: https://github.com/example/repo
 <aircbot> 📎 Saved: Example Repository - A cool project
+```
 
+### Traditional Commands  
+```
 <user> !links
 <aircbot> 📚 Recent links:
 <aircbot> • Example Repository (by user) - https://github.com/example/repo
@@ -102,6 +142,23 @@ Once running, the bot will automatically save any links shared in the channel:
 <user> !links search github
 <aircbot> 🔍 Search results for 'github':
 <aircbot> • Example Repository (by user) - https://github.com/example/repo
+
+<user> !ask what is python?
+<aircbot> 🤖 Python is a high-level programming language known for its simplicity and readability.
+```
+
+### Natural Language Mentions
+```
+<user> bubba, what links do you have?
+<aircbot> 📚 Recent links:
+<aircbot> • Example Repository (by user) - https://github.com/example/repo
+
+<user> aircbot search for python links
+<aircbot> 🔍 Search results for 'python':
+<aircbot> • Python Tutorial (by alice) - https://python.org/tutorial
+
+<user> bot, explain machine learning
+<aircbot> 🤖 Machine learning is a subset of AI that enables computers to learn from data.
 ```
 
 ## Requirements

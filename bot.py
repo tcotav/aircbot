@@ -16,6 +16,7 @@ import time
 from config import Config
 from database import Database
 from link_handler import LinkHandler
+from llm_handler import LLMHandler
 
 # Configure logging
 logging.basicConfig(
@@ -30,6 +31,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         self.config = Config()
         self.db = Database(self.config.DATABASE_PATH)
         self.link_handler = LinkHandler()
+        self.llm_handler = LLMHandler(self.config)
         
         # Configure SSL context if needed
         ssl_factory = None
@@ -83,6 +85,9 @@ class AircBot(irc.bot.SingleServerIRCBot):
         # Check for commands
         if message.startswith(self.config.COMMAND_PREFIX):
             self.handle_command(connection, channel, user, message)
+        # Check if bot is mentioned by name
+        elif self.is_bot_mentioned(message):
+            self.handle_name_mention(connection, channel, user, message)
         
         # Extract and process links
         self.process_links(connection, channel, user, message)
@@ -114,6 +119,14 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         elif command == 'help':
             self.show_help(connection, channel)
+        
+        elif command == 'ask':
+            if args:
+                # Join all arguments as the question
+                question = ' '.join(args)
+                self.handle_ask_command(connection, channel, user, question)
+            else:
+                connection.privmsg(channel, "Usage: !ask <your question>")
     
     def process_links(self, connection, channel, user, message):
         """Extract and save links from messages"""
@@ -199,6 +212,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
             "!links search <term> - Search saved links",
             "!links by <user> - Show links by specific user",
             "!links stats - Show statistics",
+            "!ask <question> - Ask the LLM a question",
             "!help - Show this help",
             "I automatically save any links you share!"
         ]
@@ -306,6 +320,224 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         if len(links) > 3:
             connection.privmsg(channel, f"... and {len(links) - 3} more links")
+    
+    def handle_ask_command(self, connection, channel, user, question):
+        """Handle !ask command - query the LLM with optional context"""
+        if not self.llm_handler.is_enabled():
+            connection.privmsg(channel, "❌ LLM is not available. Check configuration.")
+            return
+        
+        # Indicate we're thinking
+        connection.privmsg(channel, f"🤔 Thinking about: {question[:100]}...")
+        
+        # Process in a separate thread to avoid blocking
+        thread = Thread(target=self._process_ask_request, 
+                      args=(connection, channel, user, question))
+        thread.daemon = True
+        thread.start()
+    
+    def _process_ask_request(self, connection, channel, user, question):
+        """Process the LLM request in a separate thread"""
+        try:
+            # Get some recent context from the channel
+            context = self.llm_handler.get_channel_context(self.db, channel, limit=5)
+            
+            # Ask the LLM
+            response = self.llm_handler.ask_llm(question, context)
+            
+            if response:
+                # Clean the response for IRC (remove carriage returns and normalize whitespace)
+                cleaned_response = self._clean_response_for_irc(response)
+                # Split long responses across multiple messages
+                self._send_long_message(connection, channel, f"🤖 {cleaned_response}")
+            else:
+                connection.privmsg(channel, "❌ No response from LLM")
+                
+        except Exception as e:
+            logger.error(f"Error processing ask request: {e}")
+            connection.privmsg(channel, f"❌ Error processing request: {str(e)}")
+    
+    def _clean_response_for_irc(self, response: str) -> str:
+        """Clean LLM response for IRC compatibility"""
+        # Remove thinking tags that some models include
+        import re
+        response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+        
+        # Replace various newline characters with spaces
+        response = response.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
+        
+        # Replace multiple spaces with single spaces
+        response = re.sub(r'\s+', ' ', response)
+        
+        # Strip leading/trailing whitespace
+        response = response.strip()
+        
+        return response
+    
+    def _send_long_message(self, connection, channel, message, max_length=400):
+        """Split long messages into multiple IRC messages"""
+        if len(message) <= max_length:
+            connection.privmsg(channel, message)
+            return
+        
+        # Split on sentences or lines first, then by length
+        parts = []
+        remaining = message
+        
+        while remaining:
+            if len(remaining) <= max_length:
+                parts.append(remaining)
+                break
+            
+            # Try to split at sentence boundary
+            split_point = max_length
+            for punct in ['. ', '! ', '? ']:
+                punct_pos = remaining.rfind(punct, 0, max_length)
+                if punct_pos > max_length // 2:  # Don't split too early
+                    split_point = punct_pos + len(punct)
+                    break
+            
+            # If no good split point, just cut at max length
+            if split_point == max_length:
+                split_point = max_length
+            
+            parts.append(remaining[:split_point])
+            remaining = remaining[split_point:].lstrip()
+        
+        # Send each part
+        for i, part in enumerate(parts):
+            if i > 0:
+                time.sleep(0.5)  # Small delay between messages
+            connection.privmsg(channel, part)
+    
+    def is_bot_mentioned(self, message: str) -> bool:
+        """Check if the bot is mentioned in the message"""
+        import re
+        message_lower = message.lower()
+        
+        # Get the current nickname (might have _ appended if original was taken)
+        current_nick = self.connection.get_nickname().lower()
+        
+        # Check for various mention patterns with word boundaries
+        mention_patterns = [
+            rf'\b{re.escape(current_nick)}\b',  # Current nick with word boundaries
+            rf'\b{re.escape(self.config.IRC_NICKNAME.lower())}\b',  # Original configured name
+            r'\baircbot\b',  # Bot name with word boundaries
+            r'\bbot\b',  # Generic bot reference with word boundaries
+        ]
+        
+        # Check if any of the patterns appear in the message
+        for pattern in mention_patterns:
+            if re.search(pattern, message_lower):
+                return True
+        
+        return False
+    
+    def handle_name_mention(self, connection, channel, user, message):
+        """Handle when the bot is mentioned by name"""
+        # Extract the part of the message that's not the bot name
+        message_lower = message.lower()
+        current_nick = connection.get_nickname().lower()
+        
+        # Remove bot name mentions to get the actual question/comment
+        clean_message = message
+        for pattern in [current_nick, self.config.IRC_NICKNAME.lower(), "aircbot", "bot"]:
+            clean_message = clean_message.replace(pattern, "").replace(pattern.title(), "")
+        
+        # Clean up punctuation and whitespace
+        clean_message = clean_message.strip(" ,:;!?")
+        clean_message_lower = clean_message.lower()
+        
+        if clean_message and len(clean_message) > 3:  # If there's a meaningful question/comment
+            # Check if they're asking for links
+            if self._is_asking_for_links(clean_message_lower):
+                self._handle_links_request(connection, channel, clean_message_lower)
+            else:
+                # Treat it as an ask command
+                connection.privmsg(channel, f"🤔 Let me think about that...")
+                self.handle_ask_command(connection, channel, user, clean_message)
+        else:
+            # Just a mention without a question - provide help
+            responses = [
+                f"Hi {user}! I'm here to help. Try !ask <question> or !help for commands.",
+                f"Yes {user}? I can answer questions with !ask or save your links automatically.",
+                f"Hello {user}! Use !help to see what I can do, or just ask me something with !ask.",
+            ]
+            import random
+            response = random.choice(responses)
+            connection.privmsg(channel, response)
+    
+    def _is_asking_for_links(self, message: str) -> bool:
+        """Check if the user is asking for links"""
+        # Check for explicit compound phrases first (these are always link requests)
+        explicit_phrases = [
+            "saved links", "recent links", "show links", "get links", 
+            "list links", "what links", "any links", "share links",
+            "links you saved", "links you have", "links stats",
+            "links statistics", "detailed links"
+        ]
+        
+        for phrase in explicit_phrases:
+            if phrase in message:
+                return True
+        
+        # Check if message is just "links" or "links?" - treat as request
+        stripped = message.strip(" ?!.,;:")
+        if stripped == "links" or stripped == "link":
+            return True
+        
+        # For single word "links", need to have action words AND proper context
+        if "links" in message:
+            action_words = ["show", "get", "give", "list", "what", "any", "have", "share", "find", "search", "stats", "statistics", "detailed", "need", "want"]
+            has_action_word = any(word in message for word in action_words)
+            
+            if has_action_word:
+                # Check for question/request patterns
+                patterns = [
+                    r'(?:what|any|show|get|have|share|find|search|need|want).*\blinks?\b',
+                    r'\blinks?\b.*(?:you|saved|recent|have|stats|statistics|detailed)',
+                    r'(?:stats|statistics|detailed).*\blinks?\b'
+                ]
+                
+                import re
+                for pattern in patterns:
+                    if re.search(pattern, message):
+                        return True
+                        
+        return False
+    
+    def _handle_links_request(self, connection, channel, message: str):
+        """Handle different types of link requests"""
+        # Parse the request to determine what type of links command to run
+        if any(word in message for word in ["search", "find", "look for"]):
+            # Extract search term
+            import re
+            # Look for search patterns like "search for X" or "find X links"
+            search_match = re.search(r'(?:search|find|look for)\s+(.+?)(?:\s+links?|$)', message)
+            if search_match:
+                search_term = search_match.group(1).strip()
+                self.search_links(connection, channel, search_term)
+                return
+        
+        if any(word in message for word in ["by", "from", "user", "shared by"]):
+            # Extract username
+            import re
+            user_match = re.search(r'(?:by|from|shared by)\s+(\w+)', message)
+            if user_match:
+                username = user_match.group(1)
+                self.show_links_by_user(connection, channel, username)
+                return
+        
+        if any(word in message for word in ["stats", "statistics", "count", "how many"]):
+            self.show_stats(connection, channel)
+            return
+        
+        if any(word in message for word in ["details", "detailed", "timestamps", "when"]):
+            self.show_detailed_links(connection, channel)
+            return
+        
+        # Default to showing recent links
+        self.show_recent_links(connection, channel)
 
 def main():
     """Main entry point"""
