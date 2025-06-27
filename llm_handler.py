@@ -71,12 +71,12 @@ class LLMHandler:
             if context:
                 messages.append({
                     "role": "system", 
-                    "content": f"You are a helpful assistant in an IRC channel. Here's some recent context from the channel:\n{context}\n\nIMPORTANT: Keep responses very short - maximum 2 sentences. If the question is too complex for a brief answer, respond with 'That's too complicated to answer here' instead of a long explanation."
+                    "content": f"You are bubba, a friendly IRC bot. Recent context:\n{context}\n\nRespond immediately without explanation or reasoning. Example: User says 'hello' -> You say 'Hi there!' User says 'how are you?' -> You say 'I'm great, thanks!' Keep responses 1-2 sentences max."
                 })
             else:
                 messages.append({
                     "role": "system",
-                    "content": "You are a helpful assistant in an IRC channel. IMPORTANT: Keep responses very short - maximum 2 sentences. If the question is too complex for a brief answer, respond with 'That's too complicated to answer here' instead of a long explanation."
+                    "content": "You are bubba, a friendly IRC bot. Respond immediately without explanation or reasoning. Example: User says 'hello' -> You say 'Hi there!' User says 'how are you?' -> You say 'I'm great, thanks!' Keep responses 1-2 sentences max."
                 })
             
             messages.append({
@@ -117,22 +117,39 @@ class LLMHandler:
         Returns:
             Original response if short enough, otherwise fallback message
         """
-        # Remove thinking tags first for accurate counting
         import re
-        clean_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
+        
+        # Aggressively remove ALL <think> content - both closed and unclosed tags
+        # Remove everything from the first <think> to the last </think> (if it exists)
+        clean_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL)
+        
+        # If there's still an unclosed <think>, remove everything from that point onwards
+        if '<think>' in clean_response:
+            clean_response = clean_response.split('<think>')[0]
+        
+        # Remove any remaining think tag artifacts
+        clean_response = re.sub(r'</?think[^>]*>', '', clean_response, flags=re.IGNORECASE)
+        
+        # Clean up whitespace
+        clean_response = clean_response.strip()
+        
+        # If response is empty after cleaning, provide a friendly fallback
+        if not clean_response:
+            return "I'm not sure how to respond to that."
         
         # Count sentences (rough approximation)
         sentence_endings = clean_response.count('.') + clean_response.count('!') + clean_response.count('?')
         
-        # Check if response is too long (more than 2 sentences or more than 300 chars)
-        if sentence_endings > 2 or len(clean_response) > 300:
+        # Be more lenient - allow up to 3 sentences and 400 chars for simple conversations
+        if sentence_endings > 3 or len(clean_response) > 400:
             return "That's too complicated to answer here"
         
-        # Check for complexity indicators (lists, multiple paragraphs, etc.)
+        # Check for genuine complexity indicators that suggest technical explanations
         complexity_indicators = [
-            clean_response.count('\n') > 1,  # Multiple paragraphs
-            clean_response.count('1.') > 0 or clean_response.count('•') > 0,  # Lists
-            clean_response.count(':') > 2,  # Multiple explanations
+            clean_response.count('\n') > 2,  # Multiple paragraphs (more lenient)
+            clean_response.count('1.') > 1 or clean_response.count('•') > 2,  # Long lists
+            clean_response.count(':') > 3,  # Many explanations
+            any(word in clean_response.lower() for word in ['however', 'furthermore', 'moreover', 'specifically', 'particularly']),  # Academic language
         ]
         
         if any(complexity_indicators):
