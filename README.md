@@ -36,7 +36,9 @@ A simple IRC bot that automatically captures and saves links shared in channels.
 
 3. **Test the bot (optional):**
    ```bash
-   python demo.py  # See bot functionality without connecting to IRC
+   python test_suite.py          # Run all tests
+   python test_suite.py --test rate  # Test specific component
+   python demo.py               # See bot functionality without connecting to IRC
    ```
 
 4. **Run the bot:**
@@ -126,10 +128,26 @@ The bot creates two tables:
 
 The bot is structured in modular components:
 
-- `bot.py` - Main IRC bot logic
+- `bot.py` - Main IRC bot logic with rate limiting
 - `database.py` - Database operations
-- `link_handler.py` - URL detection and metadata fetching
+- `link_handler.py` - URL detection and metadata fetching  
+- `llm_handler.py` - LLM integration for questions
+- `rate_limiter.py` - Rate limiting functionality
 - `config.py` - Configuration management
+- `test_suite.py` - Comprehensive test suite
+
+### Testing
+
+Run the comprehensive test suite:
+```bash
+python test_suite.py              # Run all tests
+python test_suite.py --test mentions  # Test mention detection
+python test_suite.py --test links     # Test link request detection  
+python test_suite.py --test rate      # Test rate limiting
+python test_suite.py --test bot       # Test bot integration
+python test_suite.py --test llm       # Test LLM validation
+python test_suite.py --test flow      # Test complete flow
+```
 
 ## Example Usage
 
