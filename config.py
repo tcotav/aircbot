@@ -28,5 +28,9 @@ class Config:
     # Database
     DATABASE_PATH = os.getenv('DATABASE_PATH', 'data/links.db')
     
+    # Rate Limiting
+    RATE_LIMIT_USER_PER_MINUTE = int(os.getenv('RATE_LIMIT_USER_PER_MINUTE', '1'))
+    RATE_LIMIT_TOTAL_PER_MINUTE = int(os.getenv('RATE_LIMIT_TOTAL_PER_MINUTE', '10'))
+    
     # Bot behavior
     COMMAND_PREFIX = '!'

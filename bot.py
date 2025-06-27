@@ -17,6 +17,7 @@ from config import Config
 from database import Database
 from link_handler import LinkHandler
 from llm_handler import LLMHandler
+from rate_limiter import RateLimiter
 
 # Configure logging
 logging.basicConfig(
@@ -32,6 +33,10 @@ class AircBot(irc.bot.SingleServerIRCBot):
         self.db = Database(self.config.DATABASE_PATH)
         self.link_handler = LinkHandler()
         self.llm_handler = LLMHandler(self.config)
+        self.rate_limiter = RateLimiter(
+            user_limit_per_minute=self.config.RATE_LIMIT_USER_PER_MINUTE,
+            total_limit_per_minute=self.config.RATE_LIMIT_TOTAL_PER_MINUTE
+        )
         
         # Configure SSL context if needed
         ssl_factory = None
@@ -93,7 +98,13 @@ class AircBot(irc.bot.SingleServerIRCBot):
         self.process_links(connection, channel, user, message)
     
     def handle_command(self, connection, channel, user, message):
-        """Handle bot commands"""
+        """Handle bot commands with rate limiting"""
+        # Check rate limit
+        if not self.rate_limiter.is_allowed(user):
+            logger.info(f"Rate limited command from {user}: {message}")
+            connection.privmsg(channel, f"⏱️ {user}: Please wait a moment before sending another command.")
+            return
+        
         parts = message[1:].split()  # Remove prefix and split
         command = parts[0].lower()
         args = parts[1:] if len(parts) > 1 else []
@@ -119,6 +130,9 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         elif command == 'help':
             self.show_help(connection, channel)
+        
+        elif command == 'ratelimit' or command == 'rl':
+            self.show_rate_limit_stats(connection, channel, user)
         
         elif command == 'ask':
             if args:
@@ -213,12 +227,25 @@ class AircBot(irc.bot.SingleServerIRCBot):
             "!links by <user> - Show links by specific user",
             "!links stats - Show statistics",
             "!ask <question> - Ask the LLM a question",
+            "!ratelimit - Show rate limit status",
             "!help - Show this help",
-            "I automatically save any links you share!"
+            "I automatically save any links you share!",
+            f"Rate limits: {self.config.RATE_LIMIT_USER_PER_MINUTE}/min per user, {self.config.RATE_LIMIT_TOTAL_PER_MINUTE}/min total"
         ]
         
         for line in help_text:
             connection.privmsg(channel, line)
+    
+    def show_rate_limit_stats(self, connection, channel, user):
+        """Show rate limiting statistics"""
+        # Get overall stats
+        stats = self.rate_limiter.get_stats()
+        user_stats = self.rate_limiter.get_user_stats(user)
+        
+        connection.privmsg(channel, f"⏱️ Rate Limit Status:")
+        connection.privmsg(channel, f"• Total requests this minute: {stats['total_requests_this_minute']}/{stats['total_limit']}")
+        connection.privmsg(channel, f"• Active users: {stats['active_users']}")
+        connection.privmsg(channel, f"• {user}: {user_stats['requests_this_minute']}/{user_stats['limit']} (remaining: {user_stats['remaining']})")
     
     def on_disconnect(self, connection, event):
         """Called when disconnected from server"""
@@ -434,7 +461,13 @@ class AircBot(irc.bot.SingleServerIRCBot):
         return False
     
     def handle_name_mention(self, connection, channel, user, message):
-        """Handle when the bot is mentioned by name"""
+        """Handle when the bot is mentioned by name with rate limiting"""
+        # Check rate limit
+        if not self.rate_limiter.is_allowed(user):
+            logger.info(f"Rate limited mention from {user}: {message}")
+            connection.privmsg(channel, f"⏱️ {user}: Please wait a moment before mentioning me again.")
+            return
+        
         # Extract the part of the message that's not the bot name
         message_lower = message.lower()
         current_nick = connection.get_nickname().lower()

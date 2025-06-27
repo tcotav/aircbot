@@ -12,6 +12,7 @@ A simple IRC bot that automatically captures and saves links shared in channels.
 - **LLM Integration**: Answers questions using locally hosted LLM (Ollama/OpenAI-compatible)
 - **SSL Support**: Connects to IRC servers with SSL (including self-signed certificates)
 - **Memory System**: Maintains conversation context for better LLM responses
+- **Rate Limiting**: Prevents spam with configurable per-user and total request limits
 - **Robust Logging**: Detailed connection and error logging without channel spam
 
 ## Quick Start
@@ -67,6 +68,10 @@ Edit the `.env` file with your settings:
 ### Database
 - `DATABASE_PATH` - Path to SQLite database file
 
+### Rate Limiting  
+- `RATE_LIMIT_USER_PER_MINUTE` - Max requests per user per minute (default: 1)
+- `RATE_LIMIT_TOTAL_PER_MINUTE` - Max total requests per minute (default: 10)
+
 ## Commands
 
 ### Traditional Commands
@@ -76,6 +81,7 @@ Edit the `.env` file with your settings:
 - `!links stats` - Show link statistics 
 - `!links details` - Show recent links with timestamps
 - `!ask <question>` - Ask the LLM a question
+- `!ratelimit` - Show rate limit status  
 - `!help` - Show help information
 
 ### Natural Language (Bot Mentions)
@@ -145,6 +151,12 @@ The bot is structured in modular components:
 
 <user> !ask what is python?
 <aircbot> 🤖 Python is a high-level programming language known for its simplicity and readability.
+
+<user> !ratelimit
+<aircbot> ⏱️ Rate Limit Status:
+<aircbot> • Total requests this minute: 3/10
+<aircbot> • Active users: 2
+<aircbot> • user: 1/1 (remaining: 0)
 ```
 
 ### Natural Language Mentions
@@ -159,7 +171,17 @@ The bot is structured in modular components:
 
 <user> bot, explain machine learning
 <aircbot> 🤖 Machine learning is a subset of AI that enables computers to learn from data.
+
+<user> bubba tell me a joke
+<aircbot> ⏱️ user: Please wait a moment before mentioning me again.
 ```
+
+### Rate Limiting
+The bot enforces rate limits to prevent spam:
+- Each user is limited to a configurable number of requests per minute
+- There's also a total limit across all users per minute  
+- Users who exceed limits see friendly rate limit messages
+- Rate limits reset automatically after the time window
 
 ## Requirements
 
