@@ -62,6 +62,22 @@ def test_bot_functionality():
         print(f"• {link['title']} (by {link['user']}) - {link['url']}")
     print()
     
+    # Detailed links with timestamps
+    print("Command: !links details")
+    detailed = db.get_links_with_details("#friends", 3)
+    print("📚 Recent links (with details):")
+    for link in detailed:
+        print(f"• {link['title']} | 👤 {link['user']} | 🕐 {link['formatted_time']} | 🔗 {link['url']}")
+    print()
+    
+    # Links by user
+    print("Command: !links by charlie")
+    user_links = db.get_all_links_by_user("#friends", "charlie")
+    print("🔍 Links shared by charlie:")
+    for link in user_links:
+        print(f"• {link['title']} | 🕐 {link['formatted_time']} | 🔗 {link['url']}")
+    print()
+    
     # Search
     print("Command: !links search github")
     search_results = db.search_links("#friends", "github", 3)

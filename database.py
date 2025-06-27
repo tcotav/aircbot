@@ -118,3 +118,30 @@ class Database:
                 stats['top_contributor_count'] = top_user['count']
             
             return stats
+        
+    def get_links_with_details(self, channel: str, limit: int = 10) -> List[Dict]:
+        """Get recent links with formatted timestamps and all details"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute('''
+                SELECT url, title, description, user, channel, 
+                       datetime(timestamp, 'localtime') as formatted_time,
+                       timestamp
+                FROM links
+                WHERE channel = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ''', (channel, limit))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_all_links_by_user(self, channel: str, user: str) -> List[Dict]:
+        """Get all links shared by a specific user in a channel"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute('''
+                SELECT url, title, user, datetime(timestamp, 'localtime') as formatted_time
+                FROM links
+                WHERE channel = ? AND user = ?
+                ORDER BY timestamp DESC
+            ''', (channel, user))
+            return [dict(row) for row in cursor.fetchall()]

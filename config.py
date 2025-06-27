@@ -13,6 +13,10 @@ class Config:
     IRC_PASSWORD = os.getenv('IRC_PASSWORD', '')
     IRC_SERVER_PASSWORD = os.getenv('IRC_SERVER_PASSWORD', '')
     
+    # SSL Settings
+    IRC_USE_SSL = os.getenv('IRC_USE_SSL', 'false').lower() == 'true'
+    IRC_SSL_VERIFY = os.getenv('IRC_SSL_VERIFY', 'true').lower() == 'true'
+    
     # Database
     DATABASE_PATH = os.getenv('DATABASE_PATH', 'data/links.db')
     
