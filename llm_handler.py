@@ -5,6 +5,7 @@ from typing import Optional
 import asyncio
 from threading import Thread
 import time
+from prompts import get_system_prompt, get_error_message, get_name_response
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,35 @@ class LLMHandler:
         """Check if LLM is enabled and available"""
         return self.enabled and self.client is not None
     
+    def _check_for_name_question(self, question: str) -> Optional[str]:
+        """
+        Check if the user is asking about the bot's name and respond with IRC nickname
+        
+        Args:
+            question: The user's question
+            
+        Returns:
+            Name response if applicable, None otherwise
+        """
+        question_lower = question.lower().strip()
+        
+        name_patterns = [
+            "what's your name",
+            "what is your name", 
+            "whats your name",
+            "your name",
+            "who are you",
+            "what are you called",
+            "what do i call you",
+            "tell me your name",
+        ]
+        
+        for pattern in name_patterns:
+            if pattern in question_lower:
+                return get_name_response(self.config.IRC_NICKNAME)
+        
+        return None
+
     def ask_llm(self, question: str, context: Optional[str] = None) -> Optional[str]:
         """
         Ask a question to the LLM
@@ -62,22 +92,27 @@ class LLMHandler:
             LLM response or None if error
         """
         if not self.is_enabled():
-            return "❌ LLM is not available"
+            return get_error_message('llm_unavailable')
+        
+        # Check if this is a name question first
+        name_response = self._check_for_name_question(question)
+        if name_response:
+            return name_response
         
         try:
+            # Check if the question is about the bot's name
+            name_response = self._check_for_name_question(question)
+            if name_response:
+                return name_response
+            
             # Build the prompt
             messages = []
             
-            if context:
-                messages.append({
-                    "role": "system", 
-                    "content": f"You are bubba, a friendly IRC bot. Recent context:\n{context}\n\nRespond immediately without explanation or reasoning. Example: User says 'hello' -> You say 'Hi there!' User says 'how are you?' -> You say 'I'm great, thanks!' Keep responses 1-2 sentences max."
-                })
-            else:
-                messages.append({
-                    "role": "system",
-                    "content": "You are bubba, a friendly IRC bot. Respond immediately without explanation or reasoning. Example: User says 'hello' -> You say 'Hi there!' User says 'how are you?' -> You say 'I'm great, thanks!' Keep responses 1-2 sentences max."
-                })
+            system_content = get_system_prompt(self.config.IRC_NICKNAME, context)
+            messages.append({
+                "role": "system",
+                "content": system_content
+            })
             
             messages.append({
                 "role": "user",
@@ -105,7 +140,7 @@ class LLMHandler:
             
         except Exception as e:
             logger.error(f"Error calling LLM: {e}")
-            return f"❌ Error calling LLM: {str(e)}"
+            return get_error_message('llm_error', str(e))
     
     def _validate_response_length(self, response: str) -> str:
         """
@@ -135,14 +170,14 @@ class LLMHandler:
         
         # If response is empty after cleaning, provide a friendly fallback
         if not clean_response:
-            return "I'm not sure how to respond to that."
+            return get_error_message('no_response')
         
         # Count sentences (rough approximation)
         sentence_endings = clean_response.count('.') + clean_response.count('!') + clean_response.count('?')
         
         # Be more lenient - allow up to 3 sentences and 400 chars for simple conversations
         if sentence_endings > 3 or len(clean_response) > 400:
-            return "That's too complicated to answer here"
+            return get_error_message('too_complex')
         
         # Check for genuine complexity indicators that suggest technical explanations
         complexity_indicators = [
@@ -153,7 +188,7 @@ class LLMHandler:
         ]
         
         if any(complexity_indicators):
-            return "That's too complicated to answer here"
+            return get_error_message('too_complex')
         
         return clean_response
     

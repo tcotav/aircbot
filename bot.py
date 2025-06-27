@@ -18,6 +18,7 @@ from database import Database
 from link_handler import LinkHandler
 from llm_handler import LLMHandler
 from rate_limiter import RateLimiter
+from prompts import get_thinking_message
 
 # Configure logging
 logging.basicConfig(
@@ -355,7 +356,8 @@ class AircBot(irc.bot.SingleServerIRCBot):
             return
         
         # Indicate we're thinking
-        connection.privmsg(channel, f"🤔 Thinking about: {question[:100]}...")
+        thinking_msg = get_thinking_message(user, question[:100])
+        connection.privmsg(channel, thinking_msg)
         
         # Process in a separate thread to avoid blocking
         thread = Thread(target=self._process_ask_request, 
@@ -487,7 +489,8 @@ class AircBot(irc.bot.SingleServerIRCBot):
                 self._handle_links_request(connection, channel, clean_message_lower)
             else:
                 # Treat it as an ask command
-                connection.privmsg(channel, f"🤔 Let me think about that...")
+                thinking_msg = get_thinking_message(user, clean_message[:100])
+                connection.privmsg(channel, thinking_msg)
                 self.handle_ask_command(connection, channel, user, clean_message)
         else:
             # Just a mention without a question - provide help
