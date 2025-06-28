@@ -411,7 +411,7 @@ class LLMHandler:
                 stats[client_type] = {
                     'total_requests': total_requests,
                     'failed_requests': failed_requests,
-                    'success_rate': 0.0,
+                    'success_rate': "0.0%",
                     'avg_response_time': 0.0,
                     'min_response_time': 0.0,
                     'max_response_time': 0.0,
