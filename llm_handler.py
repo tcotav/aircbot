@@ -15,6 +15,11 @@ class LLMHandler:
         self.enabled = config.LLM_ENABLED
         self.client = None
         
+        # Performance tracking
+        self.response_times = []
+        self.total_requests = 0
+        self.failed_requests = 0
+        
         if self.enabled:
             try:
                 # Initialize OpenAI client with Ollama settings
@@ -35,6 +40,7 @@ class LLMHandler:
     
     def _test_connection(self):
         """Test the connection to the LLM"""
+        start_time = time.time()
         try:
             response = self.client.chat.completions.create(
                 model=self.config.LLM_MODEL,
@@ -42,9 +48,11 @@ class LLMHandler:
                 max_tokens=10,
                 temperature=0.1
             )
-            logger.info("LLM connection test successful")
+            connection_time = time.time() - start_time
+            logger.info(f"LLM connection test successful in {connection_time:.2f}s")
         except Exception as e:
-            logger.warning(f"LLM connection test failed: {e}")
+            connection_time = time.time() - start_time
+            logger.warning(f"LLM connection test failed after {connection_time:.2f}s: {e}")
             # Don't disable, just warn - might work later
     
     def is_enabled(self) -> bool:
@@ -99,12 +107,10 @@ class LLMHandler:
         if name_response:
             return name_response
         
+        # Start timing the LLM request
+        start_time = time.time()
+        
         try:
-            # Check if the question is about the bot's name
-            name_response = self._check_for_name_question(question)
-            if name_response:
-                return name_response
-            
             # Build the prompt
             messages = []
             
@@ -128,19 +134,62 @@ class LLMHandler:
                 stream=False
             )
             
+            # Calculate response time
+            response_time = time.time() - start_time
+            
             answer = response.choices[0].message.content.strip()
             
             # Validate response length and complexity
             validated_answer = self._validate_response_length(answer)
             
-            # Log the interaction (without full context to avoid spam)
-            logger.info(f"LLM query: '{question[:50]}...' -> response length: {len(validated_answer)} chars")
+            # Track performance statistics
+            self.total_requests += 1
+            self.response_times.append(response_time)
+            # Keep only last 100 response times to avoid memory growth
+            if len(self.response_times) > 100:
+                self.response_times = self.response_times[-100:]
+            
+            # Log the interaction with timing information
+            logger.info(f"LLM query: '{question[:50]}...' -> response length: {len(validated_answer)} chars, time: {response_time:.2f}s")
             
             return validated_answer
             
         except Exception as e:
-            logger.error(f"Error calling LLM: {e}")
+            # Calculate response time even for errors
+            response_time = time.time() - start_time
+            self.failed_requests += 1
+            logger.error(f"Error calling LLM after {response_time:.2f}s: {e}")
             return get_error_message('llm_error', str(e))
+
+    def get_performance_stats(self) -> dict:
+        """
+        Get performance statistics for the LLM
+        
+        Returns:
+            Dictionary with performance metrics
+        """
+        if not self.response_times:
+            return {
+                'total_requests': self.total_requests,
+                'failed_requests': self.failed_requests,
+                'success_rate': 0.0,
+                'avg_response_time': 0.0,
+                'min_response_time': 0.0,
+                'max_response_time': 0.0
+            }
+        
+        avg_time = sum(self.response_times) / len(self.response_times)
+        success_rate = (self.total_requests / (self.total_requests + self.failed_requests)) * 100 if (self.total_requests + self.failed_requests) > 0 else 0.0
+        
+        return {
+            'total_requests': self.total_requests,
+            'failed_requests': self.failed_requests,
+            'success_rate': f"{success_rate:.1f}%",
+            'avg_response_time': f"{avg_time:.2f}s",
+            'min_response_time': f"{min(self.response_times):.2f}s",
+            'max_response_time': f"{max(self.response_times):.2f}s",
+            'recent_requests': len(self.response_times)
+        }
     
     def _validate_response_length(self, response: str) -> str:
         """
@@ -172,17 +221,28 @@ class LLMHandler:
         if not clean_response:
             return get_error_message('no_response')
         
-        # Count sentences (rough approximation)
-        sentence_endings = clean_response.count('.') + clean_response.count('!') + clean_response.count('?')
+        # Count sentences (rough approximation) - but exclude numbered list items
+        import re
+        
+        # Count periods, but exclude those that are part of numbered lists (e.g., "1.", "2.")
+        # Look for periods that are NOT preceded by a digit
+        period_count = len(re.findall(r'(?<!\d)\.', clean_response))
+        sentence_endings = period_count + clean_response.count('!') + clean_response.count('?')
         
         # Be more lenient - allow up to 3 sentences and 400 chars for simple conversations
         if sentence_endings > 3 or len(clean_response) > 400:
             return get_error_message('too_complex')
         
         # Check for genuine complexity indicators that suggest technical explanations
+        import re
+        
+        # Count numbered list items more accurately
+        numbered_items = len(re.findall(r'\d+\.', clean_response))
+        bullet_items = clean_response.count('•')
+        
         complexity_indicators = [
             clean_response.count('\n') > 2,  # Multiple paragraphs (more lenient)
-            clean_response.count('1.') > 1 or clean_response.count('•') > 2,  # Long lists
+            numbered_items > 5 or bullet_items > 5,  # Long lists (more than 5 items)
             clean_response.count(':') > 3,  # Many explanations
             any(word in clean_response.lower() for word in ['however', 'furthermore', 'moreover', 'specifically', 'particularly']),  # Academic language
         ]

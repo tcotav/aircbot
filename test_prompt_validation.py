@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """
 Test suite for LLM prompt validation and response cleaning
+
+Note: Some tests may occasionally fail due to LLM response variability.
+This is expected behavior - the important thing is that:
+1. Complex responses are consistently rejected
+2. Most simple questions work most of the time
+3. The validation logic itself is sound
 """
 
 import sys
@@ -81,9 +87,9 @@ class TestPromptValidation(unittest.TestCase):
             # Multiple paragraphs
             "Line 1\n\nLine 2\n\nLine 3\n\nLine 4",
             
-            # Long lists
-            "Here are the steps: 1. First 2. Second 3. Third 4. Fourth 5. Fifth",
-            "Options: • Option A • Option B • Option C • Option D",
+            # Long lists (more than 5 items)
+            "Here are the steps: 1. First 2. Second 3. Third 4. Fourth 5. Fifth 6. Sixth",
+            "Options: • Option A • Option B • Option C • Option D • Option E • Option F",
             
             # Many explanations (colons)
             "First: explanation. Second: another. Third: more. Fourth: even more.",
@@ -119,6 +125,24 @@ class TestPromptValidation(unittest.TestCase):
                 # Should get a reasonable response
                 self.assertIsInstance(response, str)
                 self.assertGreater(len(response.strip()), 0)
+
+    def test_simple_lists_are_allowed(self):
+        """Test that simple lists (up to 5 items) are allowed and not rejected"""
+        simple_list_responses = [
+            # Short lists should be allowed
+            "Three options: 1. First 2. Second 3. Third",
+            "Here are four things: • Item A • Item B • Item C • Item D",
+            "Five choices: 1. One 2. Two 3. Three 4. Four 5. Five",
+            "The Rocky Mountains, Sierra Nevada, and Cascade Range.",
+        ]
+        
+        for response in simple_list_responses:
+            with self.subTest(response=response):
+                result = self.llm._validate_response_length(response)
+                # Should NOT be rejected as too complex
+                self.assertNotEqual(result, "That's too complicated to answer here")
+                # Should return the original response
+                self.assertEqual(result, response)
     
     def test_whitespace_handling(self):
         """Test proper handling of whitespace in responses"""
@@ -151,7 +175,103 @@ class TestPromptValidation(unittest.TestCase):
         too_many = "First sentence. Second sentence. Third sentence. Fourth sentence. Fifth sentence."
         result = self.llm._validate_response_length(too_many)
         self.assertEqual(result, "That's too complicated to answer here")
+    
+    def test_mountain_ranges_variations(self):
+        """Test all variations of mountain ranges questions that should be allowed"""
+        if not self.llm.is_enabled():
+            self.skipTest("LLM not available for testing")
+        
+        mountain_questions = [
+            "name three mountain ranges in the continental united states",
+            "what are three mountain ranges in the US?",
+            "list 3 mountain ranges in america",
+            "tell me three mountain ranges in the continental US",
+            "can you name three mountain ranges?",
+            "three mountain ranges in america please",
+            "what are some mountain ranges in the US?",
+            "name a few mountain ranges in america",
+        ]
+        
+        for question in mountain_questions:
+            with self.subTest(question=question):
+                response = self.llm.ask_llm(question)
+                
+                # Should not get fallback responses
+                self.assertNotEqual(response, "That's too complicated to answer here")
+                self.assertNotEqual(response, "I'm not sure how to respond to that.")
+                
+                # Should get a reasonable response
+                self.assertIsInstance(response, str)
+                self.assertGreater(len(response.strip()), 0)
+                
+                # Should mention actual mountain ranges
+                response_lower = response.lower()
+                mountain_keywords = ['rocky', 'sierra', 'cascade', 'appalachian', 'mountain']
+                has_mountain_keywords = any(keyword in response_lower for keyword in mountain_keywords)
+                self.assertTrue(has_mountain_keywords, f"Response '{response}' doesn't mention mountains")
 
+    def test_various_simple_list_questions(self):
+        """Test various types of simple list questions that should be allowed"""
+        if not self.llm.is_enabled():
+            self.skipTest("LLM not available for testing")
+        
+        simple_list_questions = [
+            # Geography
+            ("name three states in the USA", ["state", "california", "texas", "new york"]),
+            ("list three major cities in California", ["city", "los angeles", "san francisco", "diego"]),
+            ("what are three countries in Europe?", ["country", "france", "germany", "italy", "spain"]),
+            
+            # General knowledge
+            ("name three colors", ["red", "blue", "green", "yellow"]),
+            ("list three animals", ["cat", "dog", "bird", "lion", "tiger"]),
+            ("what are three fruits?", ["apple", "banana", "orange", "grape"]),
+            ("tell me three planets", ["earth", "mars", "venus", "jupiter"]),
+            
+            # Slightly longer lists (4-5 items)
+            ("list four seasons", ["spring", "summer", "fall", "winter", "autumn"]),
+            ("name five days of the week", ["monday", "tuesday", "wednesday", "thursday", "friday"]),
+        ]
+        
+        for question, expected_keywords in simple_list_questions:
+            with self.subTest(question=question):
+                response = self.llm.ask_llm(question)
+                
+                # Should not get fallback responses
+                self.assertNotEqual(response, "That's too complicated to answer here")
+                self.assertNotEqual(response, "I'm not sure how to respond to that.")
+                
+                # Should get a reasonable response
+                self.assertIsInstance(response, str)
+                self.assertGreater(len(response.strip()), 0)
+                
+                # Should contain relevant keywords
+                response_lower = response.lower()
+                has_relevant_keywords = any(keyword in response_lower for keyword in expected_keywords)
+                self.assertTrue(has_relevant_keywords, 
+                              f"Response '{response}' doesn't contain expected keywords: {expected_keywords}")
+
+    def test_complex_list_rejection(self):
+        """Test that genuinely complex lists are still properly rejected"""
+        complex_list_responses = [
+            # Very long numbered lists (more than 5 items)
+            "Steps: 1. First 2. Second 3. Third 4. Fourth 5. Fifth 6. Sixth 7. Seventh",
+            "Options: • A • B • C • D • E • F • G • H",
+            
+            # Multiple paragraphs
+            "First paragraph here.\n\nSecond paragraph.\n\nThird paragraph here.",
+            
+            # Academic language
+            "However, this is furthermore complicated. Moreover, we must specifically consider the various implications.",
+            
+            # Too many explanations
+            "First: explanation here. Second: another explanation. Third: more details. Fourth: even more.",
+        ]
+        
+        for response in complex_list_responses:
+            with self.subTest(response=response):
+                result = self.llm._validate_response_length(response)
+                # Should be rejected as too complex
+                self.assertEqual(result, "That's too complicated to answer here")
 
 def run_validation_tests():
     """Run all prompt validation tests"""

@@ -135,6 +135,9 @@ class AircBot(irc.bot.SingleServerIRCBot):
         elif command == 'ratelimit' or command == 'rl':
             self.show_rate_limit_stats(connection, channel, user)
         
+        elif command == 'performance' or command == 'perf':
+            self.show_performance_stats(connection, channel)
+        
         elif command == 'ask':
             if args:
                 # Join all arguments as the question
@@ -229,6 +232,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
             "!links stats - Show statistics",
             "!ask <question> - Ask the LLM a question",
             "!ratelimit - Show rate limit status",
+            "!performance - Show LLM performance stats",
             "!help - Show this help",
             "I automatically save any links you share!",
             f"Rate limits: {self.config.RATE_LIMIT_USER_PER_MINUTE}/min per user, {self.config.RATE_LIMIT_TOTAL_PER_MINUTE}/min total"
@@ -247,6 +251,22 @@ class AircBot(irc.bot.SingleServerIRCBot):
         connection.privmsg(channel, f"• Total requests this minute: {stats['total_requests_this_minute']}/{stats['total_limit']}")
         connection.privmsg(channel, f"• Active users: {stats['active_users']}")
         connection.privmsg(channel, f"• {user}: {user_stats['requests_this_minute']}/{user_stats['limit']} (remaining: {user_stats['remaining']})")
+    
+    def show_performance_stats(self, connection, channel):
+        """Show LLM performance statistics"""
+        if not self.llm_handler.is_enabled():
+            connection.privmsg(channel, "❌ LLM is not available - no performance stats.")
+            return
+        
+        stats = self.llm_handler.get_performance_stats()
+        
+        connection.privmsg(channel, f"📊 LLM Performance Stats:")
+        connection.privmsg(channel, f"• Total requests: {stats['total_requests']}")
+        connection.privmsg(channel, f"• Failed requests: {stats['failed_requests']}")
+        connection.privmsg(channel, f"• Success rate: {stats['success_rate']}")
+        connection.privmsg(channel, f"• Average response time: {stats['avg_response_time']}")
+        connection.privmsg(channel, f"• Response time range: {stats['min_response_time']} - {stats['max_response_time']}")
+        connection.privmsg(channel, f"• Recent sample size: {stats['recent_requests']} requests")
     
     def on_disconnect(self, connection, event):
         """Called when disconnected from server"""
@@ -368,6 +388,9 @@ class AircBot(irc.bot.SingleServerIRCBot):
     
     def _process_ask_request(self, connection, channel, user, question):
         """Process the LLM request in a separate thread"""
+        # Start timing the total request processing
+        start_time = time.time()
+        
         try:
             # Get some recent context from the channel
             context = self.llm_handler.get_channel_context(self.db, channel, limit=5)
@@ -375,16 +398,22 @@ class AircBot(irc.bot.SingleServerIRCBot):
             # Ask the LLM
             response = self.llm_handler.ask_llm(question, context)
             
+            # Calculate total processing time
+            total_time = time.time() - start_time
+            
             if response:
                 # Clean the response for IRC (remove carriage returns and normalize whitespace)
                 cleaned_response = self._clean_response_for_irc(response)
                 # Split long responses across multiple messages
                 self._send_long_message(connection, channel, f"🤖 {cleaned_response}")
+                logger.info(f"Total request processing time for '{question[:30]}...': {total_time:.2f}s")
             else:
                 connection.privmsg(channel, "❌ No response from LLM")
+                logger.warning(f"No response from LLM for '{question[:30]}...' after {total_time:.2f}s")
                 
         except Exception as e:
-            logger.error(f"Error processing ask request: {e}")
+            total_time = time.time() - start_time
+            logger.error(f"Error processing ask request '{question[:30]}...' after {total_time:.2f}s: {e}")
             connection.privmsg(channel, f"❌ Error processing request: {str(e)}")
     
     def _clean_response_for_irc(self, response: str) -> str:

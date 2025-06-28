@@ -32,6 +32,7 @@ def run_all_tests():
     test_bot_integration()
     test_llm_validation()
     test_thinking_message_duplication()
+    test_simple_list_questions()
     
     print("\n🎉 All tests completed!")
 
@@ -334,6 +335,87 @@ def test_thinking_message_duplication():
     print("✅ Thinking message duplication: All tests passed")
     return True
 
+# ===== SIMPLE LIST QUESTIONS TESTS =====
+
+def test_simple_list_questions():
+    """Test that simple list questions consistently get proper responses"""
+    print("🏔️ Testing Simple List Questions...")
+    
+    # Import here to avoid circular imports
+    from llm_handler import LLMHandler
+    from config import Config
+    
+    config = Config()
+    llm = LLMHandler(config)
+    
+    if not llm.is_enabled():
+        print("⚠️ LLM not available - skipping simple list question tests")
+        return
+    
+    # Test various simple list questions that should always work
+    test_questions = [
+        # Mountain ranges variations
+        "name three mountain ranges in the continental united states",
+        "what are three mountain ranges in the US?",
+        "list 3 mountain ranges in america",
+        "tell me three mountain ranges in the continental US",
+        "can you name three mountain ranges?",
+        "three mountain ranges in america please",
+        
+        # Other geography questions
+        "name three states in the USA",
+        "list three major cities in California",
+        "what are three rivers in the US?",
+        "tell me three countries in Europe",
+        
+        # General knowledge lists
+        "name three colors",
+        "list three animals",
+        "what are three fruits?",
+        "tell me three planets",
+        "name three programming languages",
+        
+        # Slightly longer but still simple lists
+        "list four seasons",
+        "name five days of the week",
+        "what are the four cardinal directions?",
+    ]
+    
+    passed = 0
+    total = len(test_questions)
+    failed_questions = []
+    
+    for question in test_questions:
+        try:
+            response = llm.ask_llm(question)
+            
+            # Check if it's a fallback response (rejected)
+            is_fallback = (
+                "I'm not sure how to respond" in response or
+                "too complicated" in response or
+                "That's too complicated to answer here" in response
+            )
+            
+            if is_fallback:
+                print(f"❌ '{question}' -> Got fallback: '{response}'")
+                failed_questions.append((question, response))
+            else:
+                print(f"✅ '{question}' -> '{response[:60]}...'")
+                passed += 1
+                
+        except Exception as e:
+            print(f"❌ '{question}' -> Error: {e}")
+            failed_questions.append((question, f"Error: {e}"))
+    
+    print(f"✅ Simple list questions: {passed}/{total} tests passed")
+    
+    if failed_questions:
+        print(f"\n❌ Failed questions:")
+        for question, response in failed_questions:
+            print(f"  • '{question}' -> '{response}'")
+    
+    print()
+
 # ===== COMPREHENSIVE FLOW TESTS =====
 
 def test_complete_flow():
@@ -396,7 +478,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='AircBot Test Suite')
-    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'all'], 
+    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'all'], 
                        default='all', help='Which test to run')
     
     args = parser.parse_args()
@@ -417,3 +499,5 @@ if __name__ == "__main__":
         test_complete_flow()
     elif args.test == 'thinking':
         test_thinking_message_duplication()
+    elif args.test == 'simple_lists':
+        test_simple_list_questions()
