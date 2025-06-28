@@ -35,3 +35,19 @@ class Config:
     
     # Bot behavior
     COMMAND_PREFIX = '!'
+    
+    # Message Context Settings
+    MESSAGE_QUEUE_SIZE = int(os.getenv('MESSAGE_QUEUE_SIZE', '50'))  # Local queue size per channel
+    CONTEXT_ANALYSIS_ENABLED = os.getenv('CONTEXT_ANALYSIS_ENABLED', 'true').lower() == 'true'
+    CONTEXT_RELEVANCE_THRESHOLD = float(os.getenv('CONTEXT_RELEVANCE_THRESHOLD', '0.3'))  # 0.0-1.0
+    SAVE_MESSAGES_TO_DB = os.getenv('SAVE_MESSAGES_TO_DB', 'false').lower() == 'true'
+    MAX_CONTEXT_MESSAGES = int(os.getenv('MAX_CONTEXT_MESSAGES', '10'))  # Max messages to include as context
+    
+    # Context Relevance Scoring Weights (should sum to reasonable total, e.g., ~1.0)
+    WEIGHT_KEYWORD_OVERLAP = float(os.getenv('WEIGHT_KEYWORD_OVERLAP', '0.4'))  # Direct word matches
+    WEIGHT_TECHNICAL_KEYWORDS = float(os.getenv('WEIGHT_TECHNICAL_KEYWORDS', '0.3'))  # Technical term bonus
+    WEIGHT_QUESTION_CONTEXT = float(os.getenv('WEIGHT_QUESTION_CONTEXT', '0.15'))  # Question/answer bonus
+    WEIGHT_RECENCY_BONUS = float(os.getenv('WEIGHT_RECENCY_BONUS', '0.1'))  # Recent message bonus
+    WEIGHT_BOT_INTERACTION = float(os.getenv('WEIGHT_BOT_INTERACTION', '0.1'))  # Command/mention bonus
+    WEIGHT_URL_BONUS = float(os.getenv('WEIGHT_URL_BONUS', '0.2'))  # URL/link bonus
+    PENALTY_SHORT_MESSAGE = float(os.getenv('PENALTY_SHORT_MESSAGE', '0.7'))  # Multiplier for short messages
