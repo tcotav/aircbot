@@ -77,7 +77,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         if nick == self.config.IRC_NICKNAME:
             logger.info(f"Successfully joined {channel}")
             # Send a greeting message
-            connection.privmsg(channel, "🤖 AircBot is online! I'll save any links you share here.")
+            connection.privmsg(channel, "🤖 AircBot is online!")
     
     def on_pubmsg(self, connection, event):
         """Called when a public message is received in a channel"""
