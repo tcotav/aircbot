@@ -36,6 +36,11 @@ class Config:
     # Bot behavior
     COMMAND_PREFIX = '!'
     
+    # Private messaging settings
+    PRIVATE_MSG_ENABLED = os.getenv('PRIVATE_MSG_ENABLED', 'true').lower() == 'true'
+    LINKS_USE_PRIVATE_MSG = os.getenv('LINKS_USE_PRIVATE_MSG', 'true').lower() == 'true'
+    COMMANDS_USE_PRIVATE_MSG = os.getenv('COMMANDS_USE_PRIVATE_MSG', 'true').lower() == 'true'
+    
     # Message Context Settings
     MESSAGE_QUEUE_SIZE = int(os.getenv('MESSAGE_QUEUE_SIZE', '50'))  # Local queue size per channel
     CONTEXT_ANALYSIS_ENABLED = os.getenv('CONTEXT_ANALYSIS_ENABLED', 'true').lower() == 'true'
