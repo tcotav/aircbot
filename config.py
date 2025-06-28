@@ -26,6 +26,20 @@ class Config:
     LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.7'))
     LLM_RETRY_ATTEMPTS = int(os.getenv('LLM_RETRY_ATTEMPTS', '3'))  # Retry on empty responses
     
+    # OpenAI Settings
+    # Use environment OPENAI_API_KEY directly (preferred for security)
+    # Fall back to OPENAI_API_KEY env var set by user, then config value
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY') or os.getenv('OPENAI_API_KEY_CONFIG', '')
+    OPENAI_ENABLED = os.getenv('OPENAI_ENABLED', 'true' if OPENAI_API_KEY else 'false').lower() == 'true'
+    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+    OPENAI_MAX_TOKENS = int(os.getenv('OPENAI_MAX_TOKENS', '500'))
+    OPENAI_TEMPERATURE = float(os.getenv('OPENAI_TEMPERATURE', '0.7'))
+    OPENAI_DAILY_LIMIT = int(os.getenv('OPENAI_DAILY_LIMIT', '100'))  # Max OpenAI calls per day
+    
+    # LLM Mode Settings
+    # Modes: 'local_only', 'openai_only', 'fallback' (try local first, then OpenAI)
+    LLM_MODE = os.getenv('LLM_MODE', 'local_only')
+    
     # Database
     DATABASE_PATH = os.getenv('DATABASE_PATH', 'data/links.db')
     

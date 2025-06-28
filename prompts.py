@@ -29,7 +29,7 @@ class PromptTemplates:
             "Example: User says 'hello' -> You say 'Hi there!' "
             "User says 'how are you?' -> You say 'I'm great, thanks!' "
             "User says 'name three mountain ranges' -> You say 'The Rocky Mountains, Sierra Nevada, and Cascade Range.' "
-            "Keep responses 1-2 sentences max. No thinking, just direct answers."
+            "Keep responses 1-3 sentences max. No thinking, just direct answers."
         )
         
         if context:
@@ -65,7 +65,8 @@ class PromptTemplates:
             'too_complex': "That's too complicated to answer here",
             'no_response': "I'm not sure how to respond to that.",
             'rate_limited': "⏰ Slow down! You're asking too many questions. Try again in a minute.",
-            'total_rate_limited': "⏰ Too many questions being asked right now. Please wait a moment."
+            'total_rate_limited': "⏰ Too many questions being asked right now. Please wait a moment.",
+            'openai_limit_reached': "🚫 Daily OpenAI usage limit reached. Try again tomorrow or ask something simpler for local AI."
         }
     
     @staticmethod
