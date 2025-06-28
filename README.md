@@ -1,6 +1,6 @@
 # AircBot
 
-A simple IRC bot that automatically captures and saves links shared in channels.
+An intelligent IRC bot that automatically saves shared links and provides natural language interaction through LLM integration. Features smart link management, conversational AI responses, and comprehensive performance monitoring.
 
 ## Features
 
@@ -10,11 +10,14 @@ A simple IRC bot that automatically captures and saves links shared in channels.
 - **Command Interface**: Traditional !commands for link management
 - **Natural Language**: Responds to natural mentions like "bubba, show me the links"
 - **LLM Integration**: Answers questions using locally hosted LLM (Ollama/OpenAI-compatible)
-- **Smart Retry Logic**: Automatically retries empty LLM responses (configurable attempts)
+- **Smart Response Validation**: Filters complex responses for IRC-appropriate simple answers
+- **Intelligent Retry Logic**: Automatically retries empty LLM responses (configurable attempts)
 - **SSL Support**: Connects to IRC servers with SSL (including self-signed certificates)
 - **Memory System**: Maintains conversation context for better LLM responses
 - **Rate Limiting**: Prevents spam with configurable per-user and total request limits
+- **Performance Monitoring**: Tracks LLM response times and success rates
 - **Robust Logging**: Detailed connection and error logging without channel spam
+- **Comprehensive Testing**: Clean test suite with full coverage of all functionality
 
 ## Quick Start
 
@@ -37,9 +40,9 @@ A simple IRC bot that automatically captures and saves links shared in channels.
 
 3. **Test the bot (optional):**
    ```bash
-   python test_suite.py          # Run all tests
-   python test_suite.py --test rate  # Test specific component
-   python demo.py               # See bot functionality without connecting to IRC
+   python test_suite.py          # Run main integration tests
+   python test_validation.py     # Run LLM validation tests
+   python test_performance.py    # Run performance tests (add --real-llm for actual LLM tests)
    ```
 
 4. **Run the bot:**
@@ -131,26 +134,61 @@ The bot creates two tables:
 
 The bot is structured in modular components:
 
-- `bot.py` - Main IRC bot logic with rate limiting
-- `database.py` - Database operations
+### Core Components
+- `bot.py` - Main IRC bot logic with natural language processing
+- `database.py` - Database operations and schema management
 - `link_handler.py` - URL detection and metadata fetching  
-- `llm_handler.py` - LLM integration for questions
+- `llm_handler.py` - LLM integration with validation and retry logic
 - `rate_limiter.py` - Rate limiting functionality
 - `config.py` - Configuration management
-- `test_suite.py` - Comprehensive test suite
+- `prompts.py` - LLM prompts and response templates
 
 ### Testing
 
-Run the comprehensive test suite:
+The project has a clean, comprehensive test suite organized into 3 focused files:
+
 ```bash
-python test_suite.py              # Run all tests
-python test_suite.py --test mentions  # Test mention detection
-python test_suite.py --test links     # Test link request detection  
-python test_suite.py --test rate      # Test rate limiting
-python test_suite.py --test bot       # Test bot integration
-python test_suite.py --test llm       # Test LLM validation
-python test_suite.py --test flow      # Test complete flow
+# Main integration and flow tests
+python test_suite.py
 ```
+- Bot name mention detection
+- Link request parsing
+- Rate limiter functionality  
+- Bot integration tests
+- LLM response validation
+- Simple list questions (geography, colors, etc.)
+- Complete end-to-end workflows
+
+```bash  
+# LLM validation and response processing tests
+python test_validation.py
+```
+- Think tag removal from responses
+- Response length validation
+- Sentence counting logic
+- Complex vs simple response detection
+- Whitespace handling
+- Retry logic for empty responses
+- Validation failure handling
+
+```bash
+# Performance and timing tests
+python test_performance.py [--real-llm]
+```
+- LLM performance statistics tracking
+- Response time measurements
+- Bot integration timing
+- Real LLM timing tests (with --real-llm flag)
+
+### Test Architecture
+
+The test suite has been carefully consolidated for maintainability:
+- **Previous**: 15+ scattered test files (test_*.py, debug_*.py)
+- **Current**: 3 focused, comprehensive test files
+- **Coverage**: All functionality preserved with zero redundancy
+- **Organization**: Each file has a clear, distinct purpose
+
+This clean structure makes the codebase easier to maintain while ensuring complete test coverage of all bot functionality.
 
 ## Example Usage
 
