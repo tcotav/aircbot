@@ -175,7 +175,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         if command == 'links':
             # Determine if we should use private messaging
-            use_private = self.config.LINKS_USE_PRIVATE_MSG and not is_private
+            use_private = self._should_use_private_message(is_private)
             target_channel = channel if not use_private else user
             
             if not args:
