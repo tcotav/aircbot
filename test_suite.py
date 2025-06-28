@@ -665,22 +665,25 @@ def test_openai_integration():
     
     from config import Config
     
+    # Instantiate the Config class
+    config_instance = Config()
+    
     # Check if OpenAI API key is available
-    if Config.OPENAI_API_KEY:
-        print(f"✅ OpenAI API Key found: {Config.OPENAI_API_KEY[:20]}...")
-        print(f"✅ OpenAI Auto-enabled: {Config.OPENAI_ENABLED}")
-        print(f"✅ Daily limit: {Config.OPENAI_DAILY_LIMIT}")
+    if config_instance.OPENAI_API_KEY:
+        print(f"✅ OpenAI API Key found: {config_instance.OPENAI_API_KEY[:20]}...")
+        print(f"✅ OpenAI Auto-enabled: {config_instance.OPENAI_ENABLED}")
+        print(f"✅ Daily limit: {config_instance.OPENAI_DAILY_LIMIT}")
     else:
         print("⚠️ No OpenAI API key found - skipping API tests")
         print("✅ OpenAI disabled when no key present")
         return
     
     # Test 2: Real OpenAI API Request (if enabled)
-    if Config.OPENAI_ENABLED and Config.OPENAI_API_KEY:
+    if config_instance.OPENAI_ENABLED and config_instance.OPENAI_API_KEY:
         print("\n🤖 Testing Real OpenAI API Request")
         print("=" * 40)
         
-        llm = LLMHandler(Config)
+        llm = LLMHandler(config_instance)
         print(f"Mode: {llm.mode}")
         print(f"OpenAI client available: {'✅' if llm.openai_client else '❌'}")
         
