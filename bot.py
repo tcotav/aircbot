@@ -19,6 +19,7 @@ from link_handler import LinkHandler
 from llm_handler import LLMHandler
 from rate_limiter import RateLimiter
 from prompts import get_thinking_message
+from context_manager import ContextManager
 
 # Configure logging
 logging.basicConfig(
@@ -38,6 +39,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
             user_limit_per_minute=self.config.RATE_LIMIT_USER_PER_MINUTE,
             total_limit_per_minute=self.config.RATE_LIMIT_TOTAL_PER_MINUTE
         )
+        self.context_manager = ContextManager(self.config)
         
         # Configure SSL context if needed
         ssl_factory = None
@@ -85,14 +87,22 @@ class AircBot(irc.bot.SingleServerIRCBot):
         message = event.arguments[0]
         user = event.source.nick
         
-        # Save message to database for context
-        #self.db.save_message(user, channel, message)
+        # Determine message type for context
+        is_command = message.startswith(self.config.COMMAND_PREFIX)
+        is_bot_mention = self.is_bot_mentioned(message)
+        
+        # Add message to local context queue
+        self.context_manager.add_message(user, channel, message, is_command, is_bot_mention)
+        
+        # Save message to database if enabled
+        if self.config.SAVE_MESSAGES_TO_DB:
+            self.db.save_message(user, channel, message)
         
         # Check for commands
-        if message.startswith(self.config.COMMAND_PREFIX):
+        if is_command:
             self.handle_command(connection, channel, user, message)
         # Check if bot is mentioned by name
-        elif self.is_bot_mentioned(message):
+        elif is_bot_mention:
             self.handle_name_mention(connection, channel, user, message)
         
         # Extract and process links
@@ -137,6 +147,19 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         elif command == 'performance' or command == 'perf':
             self.show_performance_stats(connection, channel)
+        
+        elif command == 'context':
+            if not args:
+                # Show context summary
+                self.show_context_summary(connection, channel)
+            elif args[0] == 'clear':
+                # Clear context for this channel
+                self.context_manager.clear_channel_context(channel)
+                connection.privmsg(channel, f"🧹 Context cleared for {channel}")
+            elif args[0] == 'test' and len(args) > 1:
+                # Test context relevance for a query
+                query = ' '.join(args[1:])
+                self.test_context_relevance(connection, channel, query)
         
         elif command == 'ask':
             if args:
@@ -231,10 +254,14 @@ class AircBot(irc.bot.SingleServerIRCBot):
             "!links by <user> - Show links by specific user",
             "!links stats - Show statistics",
             "!ask <question> - Ask the LLM a question",
+            "!context - Show context summary",
+            "!context clear - Clear context for this channel",
+            "!context test <query> - Test context relevance",
             "!ratelimit - Show rate limit status",
             "!performance - Show LLM performance stats",
             "!help - Show this help",
             "I automatically save any links you share!",
+            "💡 I now use smart context analysis for better AI responses!",
             f"Rate limits: {self.config.RATE_LIMIT_USER_PER_MINUTE}/min per user, {self.config.RATE_LIMIT_TOTAL_PER_MINUTE}/min total"
         ]
         
@@ -392,11 +419,22 @@ class AircBot(irc.bot.SingleServerIRCBot):
         start_time = time.time()
         
         try:
-            # Get some recent context from the channel
-            context = self.llm_handler.get_channel_context(self.db, channel, limit=5)
+            # Get intelligent context from local message queue
+            context_messages = self.context_manager.get_relevant_context(channel, question)
+            context_str = ""
             
-            # Ask the LLM
-            response = self.llm_handler.ask_llm(question, context)
+            if context_messages:
+                context_str = self.context_manager.format_context_for_llm(context_messages)
+                logger.info(f"Using {len(context_messages)} contextual messages for question: {question[:50]}...")
+            else:
+                # Fallback to recent context if no relevant messages found
+                recent_messages = self.context_manager.get_recent_context(channel, limit=3)
+                if recent_messages:
+                    context_str = self.context_manager.format_context_for_llm(recent_messages)
+                    logger.info(f"Using {len(recent_messages)} recent messages as fallback context")
+            
+            # Ask the LLM with context
+            response = self.llm_handler.ask_llm(question, context_str)
             
             # Calculate total processing time
             total_time = time.time() - start_time
@@ -665,6 +703,57 @@ class AircBot(irc.bot.SingleServerIRCBot):
         for msg in capability_messages:
             connection.privmsg(channel, msg)
             time.sleep(0.3)  # Small delay between messages to avoid flooding
+    
+    def show_context_summary(self, connection, channel):
+        """Show context summary for the current channel"""
+        summary = self.context_manager.get_context_summary(channel)
+        
+        if summary['total_messages'] == 0:
+            connection.privmsg(channel, "📝 No messages in context queue yet.")
+            return
+        
+        # Format timestamps
+        import datetime
+        oldest = datetime.datetime.fromtimestamp(summary['oldest_timestamp']).strftime("%H:%M")
+        newest = datetime.datetime.fromtimestamp(summary['newest_timestamp']).strftime("%H:%M")
+        
+        connection.privmsg(channel, f"📝 Context Summary for {channel}:")
+        connection.privmsg(channel, f"• Messages in queue: {summary['total_messages']}/{self.config.MESSAGE_QUEUE_SIZE}")
+        connection.privmsg(channel, f"• Unique users: {summary['unique_users']}")
+        connection.privmsg(channel, f"• Commands: {summary['commands']}")
+        connection.privmsg(channel, f"• Bot mentions: {summary['bot_mentions']}")
+        connection.privmsg(channel, f"• Time range: {oldest} - {newest}")
+        connection.privmsg(channel, f"• Context analysis: {'enabled' if self.config.CONTEXT_ANALYSIS_ENABLED else 'disabled'}")
+        connection.privmsg(channel, f"• Relevance threshold: {self.config.CONTEXT_RELEVANCE_THRESHOLD}")
+    
+    def test_context_relevance(self, connection, channel, query):
+        """Test context relevance for a given query"""
+        if not self.config.CONTEXT_ANALYSIS_ENABLED:
+            connection.privmsg(channel, "❌ Context analysis is disabled")
+            return
+        
+        # Get relevant context
+        relevant_messages = self.context_manager.get_relevant_context(channel, query, max_messages=5)
+        
+        if not relevant_messages:
+            connection.privmsg(channel, f"🔍 No relevant context found for: '{query}'")
+            return
+        
+        connection.privmsg(channel, f"🔍 Found {len(relevant_messages)} relevant messages for: '{query}'")
+        
+        for i, msg in enumerate(relevant_messages, 1):
+            # Calculate age
+            age_minutes = (time.time() - msg.timestamp) / 60
+            if age_minutes < 1:
+                age_str = "just now"
+            elif age_minutes < 60:
+                age_str = f"{int(age_minutes)}m ago"
+            else:
+                age_str = f"{int(age_minutes/60)}h ago"
+            
+            # Truncate message for display
+            content = msg.content[:80] + "..." if len(msg.content) > 80 else msg.content
+            connection.privmsg(channel, f"  {i}. [{age_str}] {msg.user}: {content}")
 
 def main():
     """Main entry point"""

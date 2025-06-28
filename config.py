@@ -35,3 +35,10 @@ class Config:
     
     # Bot behavior
     COMMAND_PREFIX = '!'
+    
+    # Message Context Settings
+    MESSAGE_QUEUE_SIZE = int(os.getenv('MESSAGE_QUEUE_SIZE', '50'))  # Local queue size per channel
+    CONTEXT_ANALYSIS_ENABLED = os.getenv('CONTEXT_ANALYSIS_ENABLED', 'true').lower() == 'true'
+    CONTEXT_RELEVANCE_THRESHOLD = float(os.getenv('CONTEXT_RELEVANCE_THRESHOLD', '0.3'))  # 0.0-1.0
+    SAVE_MESSAGES_TO_DB = os.getenv('SAVE_MESSAGES_TO_DB', 'false').lower() == 'true'
+    MAX_CONTEXT_MESSAGES = int(os.getenv('MAX_CONTEXT_MESSAGES', '10'))  # Max messages to include as context
