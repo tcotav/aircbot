@@ -33,6 +33,7 @@ def run_all_tests():
     test_llm_validation()
     test_thinking_message_duplication()
     test_simple_list_questions()
+    test_llm_retry_logic()
     
     print("\n🎉 All tests completed!")
 
@@ -472,13 +473,108 @@ def test_complete_flow():
     print(f"✅ Complete flow: {passed}/{len(test_cases)} tests passed")
     print()
 
+# ===== LLM RETRY LOGIC TESTS =====
+
+def test_llm_retry_logic():
+    """Test LLM retry logic for empty responses"""
+    print("🔄 Testing LLM Retry Logic...")
+    
+    # Create a mock LLM handler to test retry behavior
+    from llm_handler import LLMHandler
+    from config import Config
+    
+    config = Config()
+    config.LLM_RETRY_ATTEMPTS = 3
+    config.LLM_ENABLED = True
+    
+    # Create handler without initialization
+    handler = LLMHandler.__new__(LLMHandler)
+    handler.config = config
+    handler.enabled = True
+    handler.response_times = []
+    handler.total_requests = 0
+    handler.failed_requests = 0
+    
+    # Test 1: Empty responses should trigger retries
+    call_count = 0
+    def mock_empty_responses(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        
+        class MockMessage:
+            def __init__(self, content):
+                self.content = content
+                
+        class MockChoice:
+            def __init__(self, content):
+                self.message = MockMessage(content)
+                
+        class MockResponse:
+            def __init__(self, content):
+                self.choices = [MockChoice(content)]
+        
+        # Return empty for first 2, success on 3rd
+        if call_count <= 2:
+            return MockResponse("")  # Empty response
+        else:
+            return MockResponse("Success after retries!")
+    
+    # Set up mock client
+    from unittest.mock import Mock
+    handler.client = Mock()
+    handler.client.chat.completions.create = mock_empty_responses
+    
+    result = handler.ask_llm("test question")
+    assert call_count == 3, f"Expected 3 calls for retries, got {call_count}"
+    assert result == "Success after retries!", f"Expected success after retries, got: {result}"
+    
+    # Test 2: Validation failures should NOT trigger retries
+    call_count = 0
+    def mock_complex_response(**kwargs):
+        nonlocal call_count
+        call_count += 1
+        
+        class MockMessage:
+            def __init__(self, content):
+                self.content = content
+                
+        class MockChoice:
+            def __init__(self, content):
+                self.message = MockMessage(content)
+                
+        class MockResponse:
+            def __init__(self, content):
+                self.choices = [MockChoice(content)]
+        
+        # Return complex response that should be rejected by validation
+        complex_response = """This is a very long and complex response.
+        It has multiple sentences and goes into great detail.
+        This should be rejected by the validation logic.
+        But it should NOT trigger retries because it's not empty."""
+        
+        return MockResponse(complex_response)
+    
+    # Reset handler stats
+    handler.total_requests = 0
+    handler.failed_requests = 0
+    handler.response_times = []
+    
+    handler.client.chat.completions.create = mock_complex_response
+    result = handler.ask_llm("complex question")
+    
+    assert call_count == 1, f"Expected 1 call for validation failure, got {call_count}"
+    assert "too complicated" in result, f"Expected validation error, got: {result}"
+    
+    print("✅ LLM retry logic: All tests passed")
+    print()
+
 # ===== MAIN EXECUTION =====
 
 if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='AircBot Test Suite')
-    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'all'], 
+    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'retry_logic', 'all'], 
                        default='all', help='Which test to run')
     
     args = parser.parse_args()
@@ -501,3 +597,5 @@ if __name__ == "__main__":
         test_thinking_message_duplication()
     elif args.test == 'simple_lists':
         test_simple_list_questions()
+    elif args.test == 'retry_logic':
+        test_llm_retry_logic()

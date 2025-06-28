@@ -24,6 +24,7 @@ class Config:
     LLM_MODEL = os.getenv('LLM_MODEL', 'llama3.2')
     LLM_MAX_TOKENS = int(os.getenv('LLM_MAX_TOKENS', '500'))
     LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.7'))
+    LLM_RETRY_ATTEMPTS = int(os.getenv('LLM_RETRY_ATTEMPTS', '3'))  # Retry on empty responses
     
     # Database
     DATABASE_PATH = os.getenv('DATABASE_PATH', 'data/links.db')

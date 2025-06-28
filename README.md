@@ -10,6 +10,7 @@ A simple IRC bot that automatically captures and saves links shared in channels.
 - **Command Interface**: Traditional !commands for link management
 - **Natural Language**: Responds to natural mentions like "bubba, show me the links"
 - **LLM Integration**: Answers questions using locally hosted LLM (Ollama/OpenAI-compatible)
+- **Smart Retry Logic**: Automatically retries empty LLM responses (configurable attempts)
 - **SSL Support**: Connects to IRC servers with SSL (including self-signed certificates)
 - **Memory System**: Maintains conversation context for better LLM responses
 - **Rate Limiting**: Prevents spam with configurable per-user and total request limits
@@ -66,6 +67,7 @@ Edit the `.env` file with your settings:
 - `LLM_MODEL` - Model name (e.g., deepseek-r1:latest)
 - `LLM_MAX_TOKENS` - Maximum response length (default: 150)
 - `LLM_TEMPERATURE` - Creativity level 0.0-1.0 (default: 0.7)
+- `LLM_RETRY_ATTEMPTS` - Number of retries for empty LLM responses (default: 3)
 
 ### Database
 - `DATABASE_PATH` - Path to SQLite database file
@@ -84,6 +86,7 @@ Edit the `.env` file with your settings:
 - `!links details` - Show recent links with timestamps
 - `!ask <question>` - Ask the LLM a question
 - `!ratelimit` - Show rate limit status  
+- `!performance` - Show LLM performance stats (response times, retry counts)
 - `!help` - Show help information
 
 ### Natural Language (Bot Mentions)
@@ -175,6 +178,15 @@ python test_suite.py --test flow      # Test complete flow
 <aircbot> • Total requests this minute: 3/10
 <aircbot> • Active users: 2
 <aircbot> • user: 1/1 (remaining: 0)
+
+<user> !performance
+<aircbot> 📊 LLM Performance Stats:
+<aircbot> • Total requests: 15
+<aircbot> • Failed requests: 2
+<aircbot> • Success rate: 88.2%
+<aircbot> • Average response time: 1.2s
+<aircbot> • Response time range: 0.8s - 2.1s
+<aircbot> • Recent sample size: 15 requests
 ```
 
 ### Natural Language Mentions

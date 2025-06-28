@@ -86,7 +86,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         user = event.source.nick
         
         # Save message to database for context
-        self.db.save_message(user, channel, message)
+        #self.db.save_message(user, channel, message)
         
         # Check for commands
         if message.startswith(self.config.COMMAND_PREFIX):

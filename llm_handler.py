@@ -90,14 +90,14 @@ class LLMHandler:
 
     def ask_llm(self, question: str, context: Optional[str] = None) -> Optional[str]:
         """
-        Ask a question to the LLM
+        Ask a question to the LLM with retry logic for empty responses
         
         Args:
             question: The user's question
             context: Optional context from recent channel messages
             
         Returns:
-            LLM response or None if error
+            LLM response or error message
         """
         if not self.is_enabled():
             return get_error_message('llm_unavailable')
@@ -107,6 +107,38 @@ class LLMHandler:
         if name_response:
             return name_response
         
+        # Attempt the request with retries for empty responses only
+        for attempt in range(self.config.LLM_RETRY_ATTEMPTS):
+            is_retry = attempt > 0
+            if is_retry:
+                logger.info(f"Retrying LLM request (attempt {attempt + 1}/{self.config.LLM_RETRY_ATTEMPTS}) for: '{question[:30]}...'")
+            
+            result = self._make_llm_request(question, context, is_retry)
+            
+            # If result is None, it means empty response - continue to retry
+            if result is None:
+                continue
+            
+            # If result is not None, it's either a success or a validation/error message
+            # In either case, return it (don't retry on validation failures)
+            return result
+        
+        # All retries exhausted due to empty responses
+        logger.warning(f"LLM request failed after {self.config.LLM_RETRY_ATTEMPTS} attempts (empty responses) for: '{question[:30]}...'")
+        return get_error_message('no_response')
+
+    def _make_llm_request(self, question: str, context: Optional[str] = None, is_retry: bool = False) -> Optional[str]:
+        """
+        Make a single LLM request
+        
+        Args:
+            question: The user's question
+            context: Optional context from recent channel messages
+            is_retry: Whether this is a retry attempt
+            
+        Returns:
+            LLM response or None if empty (for retry), error message for other failures
+        """
         # Start timing the LLM request
         start_time = time.time()
         
@@ -137,12 +169,35 @@ class LLMHandler:
             # Calculate response time
             response_time = time.time() - start_time
             
-            answer = response.choices[0].message.content.strip()
+            # Get raw answer from LLM
+            raw_answer = response.choices[0].message.content
+            if not raw_answer or not raw_answer.strip():
+                # Empty response from LLM - this should trigger a retry
+                if is_retry:
+                    logger.warning(f"LLM returned empty response on retry after {response_time:.2f}s")
+                else:
+                    logger.warning(f"LLM returned empty response after {response_time:.2f}s")
+                self.failed_requests += 1
+                return None  # Return None to trigger retry
+            
+            answer = raw_answer.strip()
             
             # Validate response length and complexity
             validated_answer = self._validate_response_length(answer)
             
-            # Track performance statistics
+            # Check if validation failed (but this should NOT trigger retries)
+            if validated_answer in [get_error_message('no_response'), get_error_message('too_complex')]:
+                # Track performance statistics for failed validation
+                self.total_requests += 1
+                self.response_times.append(response_time)
+                # Keep only last 100 response times to avoid memory growth
+                if len(self.response_times) > 100:
+                    self.response_times = self.response_times[-100:]
+                
+                logger.info(f"LLM query: '{question[:50]}...' -> validation failed ({validated_answer}), time: {response_time:.2f}s")
+                return validated_answer  # Return error message directly
+            
+            # Track performance statistics for successful response
             self.total_requests += 1
             self.response_times.append(response_time)
             # Keep only last 100 response times to avoid memory growth
