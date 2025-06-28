@@ -395,13 +395,36 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         stats = self.llm_handler.get_performance_stats()
         
-        connection.privmsg(channel, f"📊 LLM Performance Stats:")
-        connection.privmsg(channel, f"• Total requests: {stats['total_requests']}")
-        connection.privmsg(channel, f"• Failed requests: {stats['failed_requests']}")
-        connection.privmsg(channel, f"• Success rate: {stats['success_rate']}")
-        connection.privmsg(channel, f"• Average response time: {stats['avg_response_time']}")
-        connection.privmsg(channel, f"• Response time range: {stats['min_response_time']} - {stats['max_response_time']}")
-        connection.privmsg(channel, f"• Recent sample size: {stats['recent_requests']} requests")
+        connection.privmsg(channel, f"📊 LLM Performance Stats (Mode: {stats['mode']}):")
+        
+        # Show stats for each enabled client
+        for client_type in ['local', 'openai']:
+            client_stats = stats[client_type]
+            if client_stats['enabled']:
+                if client_stats['total_requests'] == 0:
+                    line = f"• {client_type.title()}: No requests yet"
+                else:
+                    success_rate = client_stats['success_rate']
+                    avg_time = client_stats['avg_response_time']
+                    min_time = client_stats['min_response_time']
+                    max_time = client_stats['max_response_time']
+                    total_requests = client_stats['total_requests']
+                    
+                    line = f"• {client_type.title()}: {total_requests} requests, {success_rate} success, avg: {avg_time} (range: {min_time}-{max_time})"
+                
+                # Add daily usage info for OpenAI
+                if client_type == 'openai' and 'daily_usage' in client_stats:
+                    daily_usage = client_stats['daily_usage']
+                    daily_limit = client_stats['daily_limit']
+                    daily_remaining = client_stats['daily_remaining']
+                    line += f" | Daily: {daily_usage}/{daily_limit} (remaining: {daily_remaining})"
+                
+                connection.privmsg(channel, line)
+        
+        # Show overall stats
+        overall = stats['overall']
+        if overall['total_requests'] > 0:
+            connection.privmsg(channel, f"• Overall: {overall['total_requests']} total, {overall['total_failed']} failed")
     
     def on_disconnect(self, connection, event):
         """Called when disconnected from server"""

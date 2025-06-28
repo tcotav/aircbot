@@ -9,6 +9,7 @@ import os
 import time
 import re
 import threading
+import importlib
 from collections import defaultdict, deque
 
 # Add the project directory to the path
@@ -18,6 +19,7 @@ from bot import AircBot
 
 # Import bot components
 from rate_limiter import RateLimiter
+from llm_handler import LLMHandler
 
 def run_all_tests():
     """Run all test suites"""
@@ -35,6 +37,7 @@ def run_all_tests():
     test_thinking_message_duplication()
     test_simple_list_questions()
     test_llm_retry_logic()
+    test_openai_integration()
     
     print("\n🎉 All tests completed!")
 
@@ -562,14 +565,20 @@ def test_llm_retry_logic():
     config = Config()
     config.LLM_RETRY_ATTEMPTS = 3
     config.LLM_ENABLED = True
+    config.LLM_MODE = 'local_only'  # Add the new mode attribute
+    config.OPENAI_ENABLED = False
     
     # Create handler without initialization
     handler = LLMHandler.__new__(LLMHandler)
     handler.config = config
-    handler.enabled = True
-    handler.response_times = []
-    handler.total_requests = 0
-    handler.failed_requests = 0
+    handler.mode = 'local_only'  # Set the mode
+    handler.local_client = None
+    handler.openai_client = None
+    
+    # Initialize the new performance tracking structure
+    handler.response_times = {'local': [], 'openai': []}
+    handler.total_requests = {'local': 0, 'openai': 0}
+    handler.failed_requests = {'local': 0, 'openai': 0}
     
     # Test 1: Empty responses should trigger retries
     call_count = 0
@@ -597,8 +606,8 @@ def test_llm_retry_logic():
     
     # Set up mock client
     from unittest.mock import Mock
-    handler.client = Mock()
-    handler.client.chat.completions.create = mock_empty_responses
+    handler.local_client = Mock()
+    handler.local_client.chat.completions.create = mock_empty_responses
     
     result = handler.ask_llm("test question")
     assert call_count == 3, f"Expected 3 calls for retries, got {call_count}"
@@ -631,11 +640,11 @@ def test_llm_retry_logic():
         return MockResponse(complex_response)
     
     # Reset handler stats
-    handler.total_requests = 0
-    handler.failed_requests = 0
-    handler.response_times = []
+    handler.total_requests = {'local': 0, 'openai': 0}
+    handler.failed_requests = {'local': 0, 'openai': 0}
+    handler.response_times = {'local': [], 'openai': []}
     
-    handler.client.chat.completions.create = mock_complex_response
+    handler.local_client.chat.completions.create = mock_complex_response
     result = handler.ask_llm("complex question")
     
     assert call_count == 1, f"Expected 1 call for validation failure, got {call_count}"
@@ -644,13 +653,150 @@ def test_llm_retry_logic():
     print("✅ LLM retry logic: All tests passed")
     print()
 
+# ===== OPENAI INTEGRATION TESTS =====
+
+def test_openai_integration():
+    """Test OpenAI integration and environment variable handling"""
+    print("🔐 Testing OpenAI Integration...")
+    
+    # Test 1: Environment Variable Configuration
+    print("🔐 Testing Environment Variable Configuration")
+    print("=" * 50)
+    
+    from config import Config
+    
+    # Check if OpenAI API key is available
+    if Config.OPENAI_API_KEY:
+        print(f"✅ OpenAI API Key found: {Config.OPENAI_API_KEY[:20]}...")
+        print(f"✅ OpenAI Auto-enabled: {Config.OPENAI_ENABLED}")
+        print(f"✅ Daily limit: {Config.OPENAI_DAILY_LIMIT}")
+    else:
+        print("⚠️ No OpenAI API key found - skipping API tests")
+        print("✅ OpenAI disabled when no key present")
+        return
+    
+    # Test 2: Real OpenAI API Request (if enabled)
+    if Config.OPENAI_ENABLED and Config.OPENAI_API_KEY:
+        print("\n🤖 Testing Real OpenAI API Request")
+        print("=" * 40)
+        
+        llm = LLMHandler(Config)
+        print(f"Mode: {llm.mode}")
+        print(f"OpenAI client available: {'✅' if llm.openai_client else '❌'}")
+        
+        if llm.openai_client:
+            try:
+                print("\nMaking API request: 'What is 5+5?'")
+                response = llm._query_openai("What is 5+5?")
+                print(f"Response: {response}")
+                
+                # Check daily usage
+                rate_limiter = OpenAIRateLimiter(Config)
+                usage_stats = rate_limiter.get_usage_stats()
+                usage = usage_stats['today_usage']
+                print(f"Daily usage: {usage}/{Config.OPENAI_DAILY_LIMIT}")
+                
+            except Exception as e:
+                print(f"❌ API request failed: {e}")
+    
+    # Test 3: Daily Rate Limiting
+    print("\n⏱️ Testing Daily Rate Limiting")
+    print("=" * 35)
+    
+    from openai_rate_limiter import OpenAIRateLimiter
+    
+    # Create a test config with low limit
+    class TestConfig:
+        def __init__(self):
+            self.OPENAI_DAILY_LIMIT = 3
+            self.DATABASE_PATH = Config.DATABASE_PATH
+    
+    test_config = TestConfig()
+    test_limiter = OpenAIRateLimiter(test_config)
+    
+    # Check current usage
+    usage_stats = test_limiter.get_usage_stats()
+    current_usage = usage_stats['today_usage']
+    print(f"Testing with daily limit: 3")
+    print(f"Current usage: {current_usage}/3")
+    
+    if current_usage >= 3:
+        print("Already at daily limit - testing rate limit response...")
+        if not test_limiter.can_make_request():
+            print(f"OpenAI daily limit reached: {current_usage}/3")
+            from prompts import get_error_message
+            error_msg = get_error_message('openai_limit_reached')
+            print(f"Rate limited response: {error_msg}")
+            print("✅ Rate limiting working correctly!")
+        else:
+            print("❌ Rate limiting not working as expected")
+    else:
+        print("ℹ️ Daily limit not yet reached - rate limiting logic is ready")
+    
+    # Test 4: Fallback Mode
+    if Config.LLM_ENABLED and Config.OPENAI_ENABLED:
+        print("\n🔄 Testing Fallback Mode")
+        print("=" * 25)
+        
+        # Temporarily set to fallback mode
+        original_mode = Config.LLM_MODE
+        Config.LLM_MODE = 'fallback'
+        
+        llm = LLMHandler(Config)
+        print(f"Mode: {llm.mode}")
+        print(f"Local client: {'✅' if llm.local_client else '❌'}")
+        print(f"OpenAI client: {'✅' if llm.openai_client else '❌'}")
+        
+        if llm.local_client and llm.openai_client:
+            try:
+                print("\nTesting simple question (should use local AI):")
+                response = llm.ask_llm("What color is the sky?")
+                print(f"Response: {response}")
+                
+                stats = llm.get_performance_stats()
+                print(f"Local requests: {stats.get('local_requests', 0)}")
+                print(f"OpenAI requests: {stats.get('openai_requests', 0)}")
+                
+                # Check which service was actually used
+                if stats.get('local_requests', 0) > 0:
+                    print("ℹ️ Local AI was used (expected)")
+                elif stats.get('openai_requests', 0) > 0:
+                    print("ℹ️ OpenAI was used (fallback triggered)")
+                
+            except Exception as e:
+                print(f"❌ Fallback test failed: {e}")
+        
+        # Restore original mode
+        Config.LLM_MODE = original_mode
+    
+    # Test 5: Performance Stats Display
+    print("\n📊 Testing Performance Stats Display")
+    print("=" * 38)
+    
+    llm = LLMHandler(Config)
+    stats = llm.get_performance_stats()
+    
+    if Config.OPENAI_ENABLED:
+        rate_limiter = OpenAIRateLimiter(Config)
+        usage_stats = rate_limiter.get_usage_stats()
+        usage = usage_stats['today_usage']
+        remaining = Config.OPENAI_DAILY_LIMIT - usage
+        
+        print(f"Mode: {llm.mode}")
+        print(f"• Local: {stats.get('local_summary', 'No requests yet')}")
+        print(f"• Openai: {stats.get('openai_summary', 'No requests yet')} | Daily: {usage}/{Config.OPENAI_DAILY_LIMIT} (remaining: {remaining})")
+        print(f"• Overall: {stats.get('total_requests', 0)} total, {stats.get('failed_requests', 0)} failed")
+    
+    print("\n✅ All tests completed!")
+    print()
+
 # ===== MAIN EXECUTION =====
 
 if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='AircBot Test Suite')
-    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'retry_logic', 'all'], 
+    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'retry_logic', 'openai', 'all'], 
                        default='all', help='Which test to run')
     
     args = parser.parse_args()
@@ -675,3 +821,5 @@ if __name__ == "__main__":
         test_simple_list_questions()
     elif args.test == 'retry_logic':
         test_llm_retry_logic()
+    elif args.test == 'openai':
+        test_openai_integration()

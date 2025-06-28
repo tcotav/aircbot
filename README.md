@@ -64,13 +64,68 @@ Edit the `.env` file with your settings:
 - `IRC_SSL_VERIFY` - Verify SSL certificates (false for self-signed)
 
 ### LLM Settings (for !ask command and mentions)
-- `LLM_ENABLED` - Enable LLM features (true/false)
+
+The bot supports three different LLM modes for maximum flexibility:
+
+#### LLM Mode Configuration
+- `LLM_MODE` - Controls which AI service to use:
+  - `local_only` - Use only local AI (Ollama) 
+  - `openai_only` - Use only OpenAI API
+  - `fallback` - Try local AI first, fall back to OpenAI if local fails or gives poor response
+
+#### Local LLM Settings (Ollama)
+- `LLM_ENABLED` - Enable local LLM features (true/false)
 - `LLM_BASE_URL` - API endpoint (e.g., http://localhost:11434/v1 for Ollama)
 - `LLM_API_KEY` - API key (use "ollama" for local Ollama)
 - `LLM_MODEL` - Model name (e.g., deepseek-r1:latest)
 - `LLM_MAX_TOKENS` - Maximum response length (default: 150)
 - `LLM_TEMPERATURE` - Creativity level 0.0-1.0 (default: 0.7)
 - `LLM_RETRY_ATTEMPTS` - Number of retries for empty LLM responses (default: 3)
+
+#### OpenAI Settings
+
+**🔐 IMPORTANT: For security, set your OpenAI API key in your shell environment:**
+```bash
+export OPENAI_API_KEY="sk-your-api-key-here"
+```
+
+The bot automatically detects and uses your environment `OPENAI_API_KEY`. No need to put it in config files!
+
+- `OPENAI_ENABLED` - Enable OpenAI API features (auto-enabled when API key is found)
+- `OPENAI_MODEL` - OpenAI model to use (e.g., gpt-3.5-turbo, gpt-4)
+- `OPENAI_MAX_TOKENS` - Maximum response length for OpenAI (default: 150)
+- `OPENAI_TEMPERATURE` - Creativity level for OpenAI 0.0-1.0 (default: 0.7)
+- `OPENAI_DAILY_LIMIT` - Maximum OpenAI API calls per day for cost control (default: 100)
+
+#### Mode Examples
+
+**Local Only Mode** (default):
+```bash
+LLM_MODE=local_only
+LLM_ENABLED=true
+OPENAI_ENABLED=false
+```
+
+**OpenAI Only Mode**:
+```bash
+LLM_MODE=openai_only
+LLM_ENABLED=false
+OPENAI_ENABLED=true
+OPENAI_API_KEY=your_api_key_here
+```
+
+**Fallback Mode** (best of both worlds):
+```bash
+LLM_MODE=fallback
+LLM_ENABLED=true
+OPENAI_ENABLED=true
+OPENAI_API_KEY=your_api_key_here
+```
+
+In fallback mode, the bot will:
+1. Try local AI first (faster, free, private)
+2. If local AI fails or gives a poor response (e.g., "I don't know"), automatically fall back to OpenAI
+3. Provides detailed logging so you can see which service handled each request
 
 ### Database
 - `DATABASE_PATH` - Path to SQLite database file
@@ -89,7 +144,7 @@ Edit the `.env` file with your settings:
 - `!links details` - Show recent links with timestamps
 - `!ask <question>` - Ask the LLM a question
 - `!ratelimit` - Show rate limit status  
-- `!performance` - Show LLM performance stats (response times, retry counts)
+- `!performance` - Show LLM performance stats for all enabled services (response times, retry counts, success rates)
 - `!help` - Show help information
 
 ### Natural Language (Bot Mentions)
@@ -218,13 +273,10 @@ This clean structure makes the codebase easier to maintain while ensuring comple
 <aircbot> • user: 1/1 (remaining: 0)
 
 <user> !performance
-<aircbot> 📊 LLM Performance Stats:
-<aircbot> • Total requests: 15
-<aircbot> • Failed requests: 2
-<aircbot> • Success rate: 88.2%
-<aircbot> • Average response time: 1.2s
-<aircbot> • Response time range: 0.8s - 2.1s
-<aircbot> • Recent sample size: 15 requests
+<aircbot> 📊 LLM Performance Stats (Mode: fallback):
+<aircbot> Local: 12 requests, 91.7% success, avg: 0.8s (range: 0.5s-1.2s)
+<aircbot> OpenAI: 3 requests, 100% success, avg: 1.5s (range: 1.2s-1.8s)
+<aircbot> Overall: 15 total, 2 failed
 ```
 
 ### Natural Language Mentions
