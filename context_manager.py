@@ -129,16 +129,16 @@ class ContextManager:
         query_lower = query.lower()
         content_lower = message.content.lower()
         
-        # 1. Direct keyword overlap (weighted heavily)
+        # 1. Direct keyword overlap (weighted by config)
         query_words = set(re.findall(r'\b\w+\b', query_lower))
         content_words = set(re.findall(r'\b\w+\b', content_lower))
         
         if query_words and content_words:
             overlap = len(query_words.intersection(content_words))
             keyword_score = overlap / len(query_words)
-            score += keyword_score * 0.4
+            score += keyword_score * self.config.WEIGHT_KEYWORD_OVERLAP
         
-        # 2. Technical keyword bonus
+        # 2. Technical keyword bonus (weighted by config)
         query_has_tech = any(keyword in query_lower for keyword in self._technical_keywords)
         content_has_tech = any(keyword in content_lower for keyword in self._technical_keywords)
         
@@ -147,39 +147,40 @@ class ContextManager:
             matching_tech = [kw for kw in self._technical_keywords 
                            if kw in query_lower and kw in content_lower]
             if matching_tech:
-                score += min(0.3, len(matching_tech) * 0.1)
+                tech_bonus = min(self.config.WEIGHT_TECHNICAL_KEYWORDS, len(matching_tech) * 0.1)
+                score += tech_bonus
         
-        # 3. Question context bonus
+        # 3. Question context bonus (weighted by config)
         query_is_question = self._is_question(query)
         content_is_question = self._is_question(message.content)
         
         if query_is_question and content_is_question:
-            score += 0.15  # Related questions are often relevant
+            score += self.config.WEIGHT_QUESTION_CONTEXT  # Related questions are often relevant
         elif query_is_question and not content_is_question:
-            score += 0.1   # Statements can answer questions
+            score += self.config.WEIGHT_QUESTION_CONTEXT * 0.67  # Statements can answer questions (reduced weight)
         
-        # 4. Recency bonus (more recent = slightly more relevant)
+        # 4. Recency bonus (weighted by config)
         age_minutes = (time.time() - message.timestamp) / 60
         if age_minutes < 30:  # Last 30 minutes
-            recency_bonus = max(0, 0.1 * (1 - age_minutes / 30))
+            recency_bonus = max(0, self.config.WEIGHT_RECENCY_BONUS * (1 - age_minutes / 30))
             score += recency_bonus
         
-        # 5. Bot interaction bonus
+        # 5. Bot interaction bonus (weighted by config)
         if message.is_bot_mention or message.is_command:
-            score += 0.1
+            score += self.config.WEIGHT_BOT_INTERACTION
         
         # 6. User continuity bonus (same user asking follow-up)
         # This would require tracking the current user, which we'd need to pass in
         # For now, we'll skip this but it could be added later
         
-        # 7. Length penalty for very short messages (likely not contextually rich)
+        # 7. Length penalty for very short messages (configurable penalty)
         if len(message.content.strip()) < 10:
-            score *= 0.7
+            score *= self.config.PENALTY_SHORT_MESSAGE
         
-        # 8. URL/link bonus if query is about links or resources
+        # 8. URL/link bonus if query is about links or resources (weighted by config)
         if any(word in query_lower for word in ['link', 'url', 'resource', 'site', 'website']):
             if any(word in content_lower for word in ['http', 'https', 'www', '.com', '.org', '.net']):
-                score += 0.2
+                score += self.config.WEIGHT_URL_BONUS
         
         return min(1.0, score)  # Cap at 1.0
     

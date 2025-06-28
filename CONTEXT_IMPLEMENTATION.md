@@ -14,6 +14,16 @@ Added new environment variables to control context behavior:
 - `SAVE_MESSAGES_TO_DB=false` - Optional database storage for messages
 - `MAX_CONTEXT_MESSAGES=10` - Maximum messages to include as context
 
+#### **Configurable Relevance Scoring Weights:**
+Fine-tune the relevance algorithm for your community:
+- `WEIGHT_KEYWORD_OVERLAP=0.4` - Direct word matches between query and message
+- `WEIGHT_TECHNICAL_KEYWORDS=0.3` - Bonus for programming/technical terms
+- `WEIGHT_QUESTION_CONTEXT=0.15` - Bonus for questions and answers
+- `WEIGHT_RECENCY_BONUS=0.1` - Slight preference for recent messages
+- `WEIGHT_BOT_INTERACTION=0.1` - Boost for commands and bot mentions
+- `WEIGHT_URL_BONUS=0.2` - Bonus for links when query is about resources
+- `PENALTY_SHORT_MESSAGE=0.7` - Penalty multiplier for very short messages
+
 ### 2. **Context Manager** (context_manager.py)
 New intelligent context management system with:
 
@@ -72,12 +82,44 @@ Enhanced the main bot with:
 
 ### **Environment Configuration:**
 ```bash
-# Context settings
+# Basic context settings
 MESSAGE_QUEUE_SIZE=50
 CONTEXT_ANALYSIS_ENABLED=true
 CONTEXT_RELEVANCE_THRESHOLD=0.3
 SAVE_MESSAGES_TO_DB=false
 MAX_CONTEXT_MESSAGES=10
+
+# Fine-tune relevance scoring for your community
+WEIGHT_KEYWORD_OVERLAP=0.4
+WEIGHT_TECHNICAL_KEYWORDS=0.3
+WEIGHT_QUESTION_CONTEXT=0.15
+WEIGHT_RECENCY_BONUS=0.1
+WEIGHT_BOT_INTERACTION=0.1
+WEIGHT_URL_BONUS=0.2
+PENALTY_SHORT_MESSAGE=0.7
+```
+
+### **Weight Tuning Examples:**
+
+**For Technical Communities (programming, DevOps):**
+```bash
+WEIGHT_TECHNICAL_KEYWORDS=0.5
+WEIGHT_KEYWORD_OVERLAP=0.3
+WEIGHT_QUESTION_CONTEXT=0.15
+```
+
+**For General Chat Communities:**
+```bash
+WEIGHT_KEYWORD_OVERLAP=0.5
+WEIGHT_QUESTION_CONTEXT=0.2
+WEIGHT_RECENCY_BONUS=0.15
+```
+
+**For Support Channels (Q&A focused):**
+```bash
+WEIGHT_QUESTION_CONTEXT=0.4
+WEIGHT_BOT_INTERACTION=0.2
+WEIGHT_KEYWORD_OVERLAP=0.3
 ```
 
 ### **Bot Commands:**

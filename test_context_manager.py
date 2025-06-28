@@ -98,7 +98,55 @@ def test_context_manager():
     for key, value in summary.items():
         print(f"   {key}: {value}")
     
+    print("\n5. Testing configurable weights...")
+    test_configurable_weights(context_mgr, channel)
+    
     print("\n✅ Context manager test completed!")
+
+def test_configurable_weights(context_mgr, channel):
+    """Test how different weight configurations affect relevance scoring"""
+    print("🔧 Testing Configurable Relevance Weights")
+    print("-" * 50)
+    
+    # Test query
+    query = "How do I fix Python AttributeError?"
+    
+    # Get current config values
+    config = context_mgr.config
+    print(f"Current weight configuration:")
+    print(f"  Keyword overlap: {config.WEIGHT_KEYWORD_OVERLAP}")
+    print(f"  Technical keywords: {config.WEIGHT_TECHNICAL_KEYWORDS}")
+    print(f"  Question context: {config.WEIGHT_QUESTION_CONTEXT}")
+    print(f"  Bot interaction: {config.WEIGHT_BOT_INTERACTION}")
+    print(f"  Recency bonus: {config.WEIGHT_RECENCY_BONUS}")
+    print(f"  URL bonus: {config.WEIGHT_URL_BONUS}")
+    print(f"  Short message penalty: {config.PENALTY_SHORT_MESSAGE}")
+    
+    # Test relevance scoring on existing messages
+    if channel in context_mgr.message_queues:
+        messages = list(context_mgr.message_queues[channel])
+        if messages:
+            print(f"\nTesting relevance scores for query: '{query}'")
+            for msg in messages:
+                score = context_mgr._calculate_relevance_score(query, msg)
+                print(f"  Score: {score:.3f} - {msg.user}: {msg.content[:60]}{'...' if len(msg.content) > 60 else ''}")
+    
+    print("\n💡 Weight Tuning Examples for Different Communities:")
+    print()
+    print("TECHNICAL communities (programming, DevOps):")
+    print("  WEIGHT_TECHNICAL_KEYWORDS=0.5")
+    print("  WEIGHT_KEYWORD_OVERLAP=0.3")
+    print("  WEIGHT_QUESTION_CONTEXT=0.15")
+    print()
+    print("GENERAL chat communities:")
+    print("  WEIGHT_KEYWORD_OVERLAP=0.5")
+    print("  WEIGHT_QUESTION_CONTEXT=0.2")
+    print("  WEIGHT_RECENCY_BONUS=0.15")
+    print()
+    print("SUPPORT channels (Q&A focused):")
+    print("  WEIGHT_QUESTION_CONTEXT=0.4")
+    print("  WEIGHT_BOT_INTERACTION=0.2")
+    print("  WEIGHT_KEYWORD_OVERLAP=0.3")
 
 if __name__ == "__main__":
     test_context_manager()
