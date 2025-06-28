@@ -504,6 +504,11 @@ class AircBot(irc.bot.SingleServerIRCBot):
         message_lower = message.lower()
         current_nick = connection.get_nickname().lower()
         
+        # Check for capabilities question in the original message first
+        if self._is_asking_for_capabilities(message_lower):
+            self._handle_capability_request(connection, channel, user)
+            return
+        
         # Remove bot name mentions to get the actual question/comment
         clean_message = message
         for pattern in [current_nick, self.config.IRC_NICKNAME.lower(), "aircbot", "bot"]:
@@ -514,8 +519,11 @@ class AircBot(irc.bot.SingleServerIRCBot):
         clean_message_lower = clean_message.lower()
         
         if clean_message and len(clean_message) > 3:  # If there's a meaningful question/comment
+            # Check if they're asking about capabilities first
+            if self._is_asking_for_capabilities(clean_message_lower):
+                self._handle_capability_request(connection, channel, user)
             # Check if they're asking for links
-            if self._is_asking_for_links(clean_message_lower):
+            elif self._is_asking_for_links(clean_message_lower):
                 self._handle_links_request(connection, channel, clean_message_lower)
             else:
                 # Treat it as an ask command
@@ -532,6 +540,33 @@ class AircBot(irc.bot.SingleServerIRCBot):
             import random
             response = random.choice(responses)
             connection.privmsg(channel, response)
+    
+    def _is_asking_for_capabilities(self, message: str) -> bool:
+        """Check if the user is asking about the bot's capabilities or what it can do"""
+        capability_phrases = [
+            "what can you do", "what do you do", "what are you for",
+            "what are your capabilities", "what are your features",
+            "what can you help with", "what can you help me with",
+            "how can you help", "what commands", "what functions",
+            "what are your commands", "what are your functions",
+            "help me", "show help", "tell me what you do",
+            "what's your purpose", "what is your purpose",
+            "how do you work", "what do you offer"
+        ]
+        
+        message_lower = message.lower().strip()
+        
+        # Check for exact or partial matches
+        for phrase in capability_phrases:
+            if phrase in message_lower:
+                return True
+        
+        # Check if it's just "help" or "capabilities"
+        stripped = message_lower.strip(" ?!.,;:")
+        if stripped in ["help", "capabilities", "commands", "functions", "purpose"]:
+            return True
+            
+        return False
     
     def _is_asking_for_links(self, message: str) -> bool:
         """Check if the user is asking for links"""
@@ -604,6 +639,32 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         # Default to showing recent links
         self.show_recent_links(connection, channel)
+    
+    def _handle_capability_request(self, connection, channel, user):
+        """Handle requests about the bot's capabilities"""
+        capability_messages = [
+            f"🤖 Hi {user}! Here's what I can do:",
+            "📎 I automatically save any links you share in the channel",
+            "💬 You can mention me or ask me questions and I'll respond using AI",
+            "🔍 Link management commands:",
+            "  • !links - Show recent links",
+            "  • !links search <term> - Search saved links",
+            "  • !links by <user> - Show links by specific user",
+            "  • !links stats - Show statistics",
+            "  • !links details - Show recent links with timestamps",
+            "🤖 AI commands:",
+            "  • !ask <question> - Ask me anything",
+            "  • Just mention my name and ask a question",
+            "📊 Utility commands:",
+            "  • !ratelimit - Check rate limit status",
+            "  • !performance - Show AI performance stats",
+            "  • !help - Show command help",
+            f"⚡ Rate limits: {self.config.RATE_LIMIT_USER_PER_MINUTE}/min per user, {self.config.RATE_LIMIT_TOTAL_PER_MINUTE}/min total"
+        ]
+        
+        for msg in capability_messages:
+            connection.privmsg(channel, msg)
+            time.sleep(0.3)  # Small delay between messages to avoid flooding
 
 def main():
     """Main entry point"""

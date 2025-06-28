@@ -27,6 +27,7 @@ def run_all_tests():
     
     # Run all test categories
     test_mention_detection()
+    test_capability_detection()
     test_link_request_detection()
     test_rate_limiter()
     test_bot_integration()
@@ -80,6 +81,81 @@ def test_mention_detection():
         passed += (result == expected)
     
     print(f"✅ Mention detection: {passed}/{len(test_cases)} tests passed")
+    print()
+
+# ===== CAPABILITY DETECTION TESTS =====
+
+def is_asking_for_capabilities(message: str) -> bool:
+    """Check if the user is asking about the bot's capabilities or what it can do"""
+    capability_phrases = [
+        "what can you do", "what do you do", "what are you for",
+        "what are your capabilities", "what are your features",
+        "what can you help with", "what can you help me with",
+        "how can you help", "what commands", "what functions",
+        "what are your commands", "what are your functions",
+        "help me", "show help", "tell me what you do",
+        "what's your purpose", "what is your purpose",
+        "how do you work", "what do you offer"
+    ]
+    
+    message_lower = message.lower().strip()
+    
+    # Check for exact or partial matches
+    for phrase in capability_phrases:
+        if phrase in message_lower:
+            return True
+    
+    # Check if it's just "help" or "capabilities"
+    stripped = message_lower.strip(" ?!.,;:")
+    if stripped in ["help", "capabilities", "commands", "functions", "purpose"]:
+        return True
+        
+    return False
+
+def test_capability_detection():
+    """Test capability question detection"""
+    print("🤖 Testing Capability Question Detection...")
+    
+    test_cases = [
+        # Should detect as capability questions
+        ("what can you do?", True),
+        ("what can you do", True),
+        ("What are your capabilities?", True),
+        ("help", True),
+        ("Help", True),
+        ("help me", True),
+        ("what commands do you have?", True),
+        ("how can you help?", True),
+        ("what's your purpose?", True),
+        ("tell me what you do", True),
+        ("show help", True),
+        ("capabilities", True),
+        ("commands", True),
+        ("functions", True),
+        
+        # Should NOT detect as capability questions
+        ("what links do you have?", False),
+        ("show me links", False),
+        ("what's the weather?", False),
+        ("hello", False),
+        ("thanks", False),
+        ("search for python tutorials", False),
+        ("what time is it?", False),
+        ("random question about cats", False),
+        ("what are you talking about?", False),
+        ("show recent links", False),
+        ("search links", False),
+    ]
+    
+    passed = 0
+    for message, expected in test_cases:
+        result = is_asking_for_capabilities(message)
+        status = "✅" if result == expected else "❌"
+        if result != expected:
+            print(f"{status} '{message}' -> {result} (expected {expected})")
+        passed += (result == expected)
+    
+    print(f"✅ Capability detection: {passed}/{len(test_cases)} tests passed")
     print()
 
 # ===== LINK REQUEST DETECTION TESTS =====
