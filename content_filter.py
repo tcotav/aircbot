@@ -266,7 +266,7 @@ class ContentFilter:
         """Log blocked attempt to audit database"""
         try:
             # Create hash of message for privacy (don't store full message)
-            message_hash = hashlib.sha256(message.encode()).hexdigest()[:16]
+            message_hash = hashlib.sha256(message.encode()).hexdigest()
             
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
