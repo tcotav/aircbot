@@ -360,7 +360,9 @@ class LLMHandler:
             answer = raw_answer.strip()
             
             # Validate response length and complexity
-            validated_answer = self._validate_response_length(answer)
+            # In fallback mode, be more lenient with local responses since OpenAI can handle complex queries
+            use_strict_validation = not (self.mode == 'fallback' and client_type == 'local' and self.openai_client)
+            validated_answer = self._validate_response_length(answer, strict=use_strict_validation)
             
             # Check if validation failed (but this should NOT trigger retries)
             if validated_answer in [get_error_message('no_response'), get_error_message('too_complex')]:
@@ -450,12 +452,13 @@ class LLMHandler:
         
         return stats
     
-    def _validate_response_length(self, response: str) -> str:
+    def _validate_response_length(self, response: str, strict: bool = True) -> str:
         """
         Validate that response is appropriately short for IRC
         
         Args:
             response: Raw LLM response
+            strict: If True, apply strict validation. If False, be more lenient (for fallback scenarios)
             
         Returns:
             Original response if short enough, otherwise fallback message
@@ -488,8 +491,18 @@ class LLMHandler:
         period_count = len(re.findall(r'(?<!\d)\.', clean_response))
         sentence_endings = period_count + clean_response.count('!') + clean_response.count('?')
         
-        # Be more lenient - allow up to 3 sentences and 400 chars for simple conversations
-        if sentence_endings > 3 or len(clean_response) > 400:
+        # Adjust validation thresholds based on strict mode
+        if strict:
+            # Strict validation for cases where no fallback is available
+            max_sentences = 3
+            max_chars = 400
+        else:
+            # More lenient validation when OpenAI fallback is available
+            max_sentences = 5  # Allow longer responses
+            max_chars = 600    # Allow more characters
+        
+        # Be more lenient - allow up to max_sentences and max_chars for simple conversations
+        if sentence_endings > max_sentences or len(clean_response) > max_chars:
             return get_error_message('too_complex')
         
         # Check for genuine complexity indicators that suggest technical explanations
@@ -499,12 +512,22 @@ class LLMHandler:
         numbered_items = len(re.findall(r'\d+\.', clean_response))
         bullet_items = clean_response.count('•')
         
-        complexity_indicators = [
-            clean_response.count('\n') > 2,  # Multiple paragraphs (more lenient)
-            numbered_items > 5 or bullet_items > 5,  # Long lists (more than 5 items)
-            clean_response.count(':') > 3,  # Many explanations
-            any(word in clean_response.lower() for word in ['however', 'furthermore', 'moreover', 'specifically', 'particularly']),  # Academic language
-        ]
+        if strict:
+            # Strict complexity checking
+            complexity_indicators = [
+                clean_response.count('\n') > 2,  # Multiple paragraphs
+                numbered_items > 5 or bullet_items > 5,  # Long lists (more than 5 items)
+                clean_response.count(':') > 3,  # Many explanations
+                any(word in clean_response.lower() for word in ['however', 'furthermore', 'moreover', 'specifically', 'particularly']),  # Academic language
+            ]
+        else:
+            # More lenient complexity checking when fallback is available
+            complexity_indicators = [
+                clean_response.count('\n') > 4,  # Allow more paragraphs
+                numbered_items > 8 or bullet_items > 8,  # Allow longer lists
+                clean_response.count(':') > 5,  # Allow more explanations
+                # Remove academic language restriction when OpenAI fallback is available
+            ]
         
         if any(complexity_indicators):
             return get_error_message('too_complex')

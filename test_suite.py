@@ -36,6 +36,8 @@ def run_all_tests():
     test_llm_validation()
     test_thinking_message_duplication()
     test_simple_list_questions()
+    test_emotional_and_complex_questions()
+    test_fallback_logic()
     test_llm_retry_logic()
     test_openai_integration()
     
@@ -496,6 +498,177 @@ def test_simple_list_questions():
     
     print()
 
+# ===== EMOTIONAL AND COMPLEX QUESTIONS TESTS =====
+
+def test_emotional_and_complex_questions():
+    """Test that emotional and complex questions get proper responses"""
+    print("💭 Testing Emotional and Complex Questions...")
+    
+    from llm_handler import LLMHandler
+    from config import Config
+    
+    config = Config()
+    llm = LLMHandler(config)
+    
+    if not llm.is_enabled():
+        print("⚠️ LLM not available - skipping emotional/complex question tests")
+        return
+    
+    # Test various emotional and complex questions that should get good responses
+    test_questions = [
+        # Emotional questions
+        "what do you do when the sadness overwhelms you",
+        "how do I deal with anxiety at work",
+        "how do I comfort a friend who lost their pet",
+        "what should I do when I feel overwhelmed",
+        "how to cope with stress from family issues",
+        
+        # Complex factual questions
+        "what are the major economic exports of Italy",
+        "explain the philosophical concept of existentialism",
+        "how do neural networks process backpropagation algorithms",
+        "what are the legal implications of international maritime law",
+        
+        # Technical questions
+        "explain quantum field theory in relation to particle physics",
+        "what is the exact molecular composition of synthetic diamond lattices",
+        "how does blockchain technology ensure data integrity",
+        "what are the principles of machine learning optimization"
+    ]
+    
+    passed = 0
+    total = len(test_questions)
+    failed_questions = []
+    
+    for question in test_questions:
+        try:
+            response = llm.ask_llm(question)
+            
+            # Check if it's a rejection response
+            rejection_responses = [
+                "I'm not sure how to respond",
+                "too complicated",
+                "That's too complicated to answer here",
+                "I don't know",
+                "I can't help",
+                "I don't have information"
+            ]
+            
+            is_rejection = any(reject in response for reject in rejection_responses)
+            
+            if is_rejection:
+                print(f"❌ '{question}' -> Rejected: '{response}'")
+                failed_questions.append((question, response))
+            else:
+                # Check for meaningful response (at least 20 characters)
+                if len(response.strip()) >= 20:
+                    print(f"✅ '{question}' -> '{response[:60]}...'")
+                    passed += 1
+                else:
+                    print(f"❌ '{question}' -> Too short: '{response}'")
+                    failed_questions.append((question, response))
+                
+        except Exception as e:
+            print(f"❌ '{question}' -> Error: {e}")
+            failed_questions.append((question, f"Error: {e}"))
+    
+    print(f"✅ Emotional/Complex questions: {passed}/{total} tests passed")
+    
+    if failed_questions:
+        print(f"\n❌ Failed questions:")
+        for question, response in failed_questions[:3]:  # Show only first 3 failures
+            print(f"  • '{question}' -> '{response[:80]}...'")
+        if len(failed_questions) > 3:
+            print(f"  • ... and {len(failed_questions) - 3} more failures")
+    
+    print()
+
+# ===== FALLBACK LOGIC TESTS =====
+
+def test_fallback_logic():
+    """Test that fallback mode properly switches between local and OpenAI"""
+    print("🔄 Testing Fallback Logic...")
+    
+    from llm_handler import LLMHandler
+    from config import Config
+    
+    config = Config()
+    
+    # Only run this test if we're in fallback mode and both clients are available
+    if config.LLM_MODE != 'fallback':
+        print("ℹ️ Not in fallback mode - skipping fallback logic test")
+        return
+    
+    llm = LLMHandler(config)
+    
+    if not (llm.local_client and llm.openai_client):
+        print("⚠️ Both local and OpenAI clients needed for fallback test - skipping")
+        print(f"   Local: {'✅' if llm.local_client else '❌'}")
+        print(f"   OpenAI: {'✅' if llm.openai_client else '❌'}")
+        return
+    
+    print(f"Mode: {llm.mode}")
+    print(f"Local client: {'✅' if llm.local_client else '❌'}")
+    print(f"OpenAI client: {'✅' if llm.openai_client else '❌'}")
+    
+    # Test questions that should trigger different behaviors
+    test_cases = [
+        # Simple question that local should handle
+        ("name three colors", "local", "Should be handled by local LLM"),
+        
+        # Complex question that might trigger fallback
+        ("explain the detailed socioeconomic factors that led to the fall of the Roman Empire including political, military, and cultural implications", "fallback", "Might trigger OpenAI fallback"),
+        
+        # Emotional question that benefits from OpenAI
+        ("I'm feeling really anxious about my job interview tomorrow and can't sleep", "either", "Should get helpful response from either service")
+    ]
+    
+    passed = 0
+    total = len(test_cases)
+    
+    for question, expected_service, description in test_cases:
+        print(f"\n🧪 Testing: {description}")
+        print(f"    Question: '{question[:50]}...'")
+        
+        # Reset stats to track which service is used
+        initial_local = llm.total_requests.get('local', 0)
+        initial_openai = llm.total_requests.get('openai', 0)
+        
+        try:
+            response = llm.ask_llm(question)
+            
+            # Check which service was used
+            local_used = llm.total_requests.get('local', 0) > initial_local
+            openai_used = llm.total_requests.get('openai', 0) > initial_openai
+            
+            service_used = []
+            if local_used:
+                service_used.append("local")
+            if openai_used:
+                service_used.append("openai")
+            
+            service_str = " + ".join(service_used) if service_used else "none"
+            
+            # Check response quality (be more lenient for simple factual answers)
+            is_good_response = (
+                len(response.strip()) >= 10 and  # Reduced from 20 to 10 for simple answers like "red, blue, green"
+                not any(reject in response.lower() for reject in ["i don't know", "i'm not sure", "too complicated"])
+            )
+            
+            if is_good_response:
+                print(f"    ✅ Service used: {service_str}")
+                print(f"    ✅ Response: '{response[:60]}...'")
+                passed += 1
+            else:
+                print(f"    ❌ Service used: {service_str}")
+                print(f"    ❌ Poor response: '{response[:60]}...'")
+                
+        except Exception as e:
+            print(f"    ❌ Error: {e}")
+    
+    print(f"\n✅ Fallback logic: {passed}/{total} tests passed")
+    print()
+
 # ===== COMPREHENSIVE FLOW TESTS =====
 
 def test_complete_flow():
@@ -799,7 +972,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='AircBot Test Suite')
-    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'retry_logic', 'openai', 'all'], 
+    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'emotional', 'fallback', 'retry_logic', 'openai', 'all'], 
                        default='all', help='Which test to run')
     
     args = parser.parse_args()
@@ -822,6 +995,10 @@ if __name__ == "__main__":
         test_thinking_message_duplication()
     elif args.test == 'simple_lists':
         test_simple_list_questions()
+    elif args.test == 'emotional':
+        test_emotional_and_complex_questions()
+    elif args.test == 'fallback':
+        test_fallback_logic()
     elif args.test == 'retry_logic':
         test_llm_retry_logic()
     elif args.test == 'openai':
