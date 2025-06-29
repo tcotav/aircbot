@@ -20,6 +20,7 @@ from llm_handler import LLMHandler
 from rate_limiter import RateLimiter
 from prompts import get_thinking_message
 from context_manager import ContextManager
+from content_filter import ContentFilter
 
 # Configure logging
 logging.basicConfig(
@@ -40,6 +41,9 @@ class AircBot(irc.bot.SingleServerIRCBot):
             total_limit_per_minute=self.config.RATE_LIMIT_TOTAL_PER_MINUTE
         )
         self.context_manager = ContextManager(self.config)
+        
+        # Initialize content filter (after LLM handler so it can use local LLM)
+        self.content_filter = ContentFilter(self.config, self.llm_handler)
         
         # Configure SSL context if needed
         ssl_factory = None
@@ -146,6 +150,13 @@ class AircBot(irc.bot.SingleServerIRCBot):
     def _process_private_conversation(self, connection, user, message):
         """Process private conversation using LLM"""
         try:
+            # Filter content before processing
+            filter_result = self.content_filter.filter_content(message, user, "PRIVATE")
+            if not filter_result.is_allowed:
+                connection.privmsg(user, "❌ Your message cannot be processed. Please keep conversations appropriate.")
+                logger.warning(f"Blocked private conversation from {user}: {filter_result.reason}")
+                return
+            
             # For private conversations, we could use a different context approach
             # For now, let's use a simple conversation without channel context
             response = self.llm_handler.ask_llm(message, "")
@@ -252,6 +263,14 @@ class AircBot(irc.bot.SingleServerIRCBot):
                 self.handle_ask_command(connection, channel, user, question)
             else:
                 connection.privmsg(channel, "Usage: !ask <your question>")
+        
+        elif command == 'audit':
+            # Show content filter audit statistics (admin-like feature)
+            use_private = self.config.COMMANDS_USE_PRIVATE_MSG and not is_private
+            target_channel = channel if not use_private else user
+            self.show_audit_stats(connection, target_channel)
+            if use_private:
+                connection.privmsg(channel, f"📩 Sent audit stats to {user} via private message.")
     
     def process_links(self, connection, channel, user, message):
         """Extract and save links from messages"""
@@ -364,9 +383,11 @@ class AircBot(irc.bot.SingleServerIRCBot):
             "!context test <query> - Test context relevance",
             "!ratelimit - Show rate limit status",
             "!performance - Show LLM performance stats",
+            "!audit - Show content filter audit statistics",
             "!help - Show this help",
             "I automatically save any links you share!",
             "💡 I now use smart context analysis for better AI responses!",
+            "🛡️ Content filtering protects against inappropriate messages!",
             f"📩 Most commands send responses privately{' (disabled)' if not self.config.COMMANDS_USE_PRIVATE_MSG else ''}",
             f"💬 !ask responses stay public for community benefit",
             f"💬 You can also message me directly for private conversations{' (disabled)' if not self.config.PRIVATE_MSG_ENABLED else ''}",
@@ -547,6 +568,14 @@ class AircBot(irc.bot.SingleServerIRCBot):
         """Handle !ask command - query the LLM with optional context"""
         if not self.llm_handler.is_enabled():
             connection.privmsg(channel, "❌ LLM is not available. Check configuration.")
+            return
+        
+        # Filter content before processing
+        filter_result = self.content_filter.filter_content(question, user, channel)
+        if not filter_result.is_allowed:
+            # Don't reveal the exact reason to avoid giving hints to bad actors
+            connection.privmsg(channel, f"❌ {user}: Your message cannot be processed. Please keep discussions appropriate.")
+            logger.warning(f"Blocked ask command from {user} in {channel}: {filter_result.reason}")
             return
         
         # Indicate we're thinking (unless already shown)
@@ -903,6 +932,32 @@ class AircBot(irc.bot.SingleServerIRCBot):
             # Truncate message for display
             content = msg.content[:80] + "..." if len(msg.content) > 80 else msg.content
             connection.privmsg(channel, f"  {i}. [{age_str}] {msg.user}: {content}")
+
+    def show_audit_stats(self, connection, channel):
+        """Show content filter audit statistics"""
+        try:
+            # Get audit stats for last 24 hours
+            stats = self.content_filter.get_audit_stats(24)
+            
+            connection.privmsg(channel, f"🛡️ Content Filter Audit (Last 24h):")
+            connection.privmsg(channel, f"• Total blocked attempts: {stats['total_blocked']}")
+            
+            if stats['by_filter_type']:
+                connection.privmsg(channel, "• Blocked by type:")
+                for filter_type, count in stats['by_filter_type'].items():
+                    connection.privmsg(channel, f"  - {filter_type}: {count}")
+            
+            if stats['top_users']:
+                connection.privmsg(channel, "• Top offenders:")
+                for user, count in list(stats['top_users'].items())[:3]:
+                    connection.privmsg(channel, f"  - {user}: {count} attempts")
+            
+            if stats['total_blocked'] == 0:
+                connection.privmsg(channel, "✅ No inappropriate content blocked in the last 24 hours!")
+                
+        except Exception as e:
+            logger.error(f"Error showing audit stats: {e}")
+            connection.privmsg(channel, "❌ Error retrieving audit statistics.")
 
 def main():
     """Main entry point"""

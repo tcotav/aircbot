@@ -40,6 +40,7 @@ def run_all_tests():
     test_fallback_logic()
     test_llm_retry_logic()
     test_openai_integration()
+    test_content_filter()
     
     print("\n🎉 All tests completed!")
 
@@ -966,13 +967,83 @@ def test_openai_integration():
     print("\n✅ All tests completed!")
     print()
 
+# ===== CONTENT FILTER TESTS =====
+
+def test_content_filter():
+    """Test content filtering functionality"""
+    print("🛡️ Testing Content Filter")
+    print("-" * 30)
+    
+    try:
+        from content_filter import ContentFilter
+        
+        # Mock config for testing
+        class MockConfig:
+            DATABASE_PATH = "data/links.db"
+        
+        config = MockConfig()
+        content_filter = ContentFilter(config)
+        
+        # Test cases for content filtering
+        test_cases = [
+            # (message, expected_allowed, description)
+            ("Hello world", True, "Normal message"),
+            ("Can you help me with Python?", True, "Technical question"),
+            ("This is fucking ridiculous", False, "Profanity"),
+            ("I want to hack into this system", False, "Hacking reference"),
+            ("My SSN is 123-45-6789", False, "Social Security Number"),
+            ("Call me at 555-123-4567", False, "Phone number"),
+            ("HELLO THIS IS ALL CAPS!!!!!", False, "Excessive caps"),
+            ("a" * 1001, False, "Message too long"),
+            ("Normal programming discussion", True, "Programming topic"),
+        ]
+        
+        passed = 0
+        failed = 0
+        
+        for message, expected_allowed, description in test_cases:
+            try:
+                result = content_filter.filter_content(message, "testuser", "#testchannel")
+                
+                if result.is_allowed == expected_allowed:
+                    print(f"  ✅ {description}")
+                    passed += 1
+                else:
+                    print(f"  ❌ {description} - Expected: {'Allow' if expected_allowed else 'Block'}, Got: {'Allow' if result.is_allowed else 'Block'}")
+                    if not result.is_allowed:
+                        print(f"     Reason: {result.reason}")
+                    failed += 1
+                    
+            except Exception as e:
+                print(f"  ❌ {description} - Error: {e}")
+                failed += 1
+        
+        # Test audit statistics
+        try:
+            stats = content_filter.get_audit_stats(24)
+            print(f"  📊 Audit stats: {stats['total_blocked']} blocked attempts")
+            if stats['by_filter_type']:
+                for filter_type, count in stats['by_filter_type'].items():
+                    print(f"     - {filter_type}: {count}")
+        except Exception as e:
+            print(f"  ⚠️ Audit stats error: {e}")
+        
+        print(f"Content Filter Results: {passed} passed, {failed} failed")
+        
+    except ImportError as e:
+        print(f"  ⚠️ Could not import content filter: {e}")
+    except Exception as e:
+        print(f"  ❌ Content filter test error: {e}")
+    
+    print("✅ Content filter tests completed\n")
+
 # ===== MAIN EXECUTION =====
 
 if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='AircBot Test Suite')
-    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'emotional', 'fallback', 'retry_logic', 'openai', 'all'], 
+    parser.add_argument('--test', choices=['mentions', 'links', 'rate', 'bot', 'llm', 'flow', 'thinking', 'simple_lists', 'emotional', 'fallback', 'retry_logic', 'openai', 'content_filter', 'all'], 
                        default='all', help='Which test to run')
     
     args = parser.parse_args()
@@ -1003,3 +1074,5 @@ if __name__ == "__main__":
         test_llm_retry_logic()
     elif args.test == 'openai':
         test_openai_integration()
+    elif args.test == 'content_filter':
+        test_content_filter()
