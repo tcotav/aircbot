@@ -167,6 +167,13 @@ class SimpleDiscordBot(discord.Client):
             if 'top_contributor' in stats:
                 response += f" (top: {stats['top_contributor']} with {stats['top_contributor_count']} links)"
             await message.channel.send(response)
+        else:
+            # Handle unknown subcommands or invalid syntax
+            if args[0] == "search" and len(args) == 1:
+                await message.channel.send("Usage: !links search <search term>")
+            else:
+                await message.channel.send(f"Unknown links command: {args[0]}\nValid options: !links, !links search <term>, !links stats")
+
 
     async def handle_ask_command(self, message, question: str):
         """Handle AI ask command"""
