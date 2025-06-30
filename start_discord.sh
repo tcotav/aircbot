@@ -14,11 +14,11 @@ if [ ! -f .env ]; then
 fi
 
 # Check if discord.py is installed
-/Volumes/T7/code/github/tcotav/aircbot/venv/bin/python -c "import discord" 2>/dev/null
+$(dirname "$0")/venv/bin/python -c "import discord" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "Installing discord.py..."
-    /Volumes/T7/code/github/tcotav/aircbot/venv/bin/pip install discord.py
+    $(dirname "$0")/venv/bin/pip install discord.py
 fi
 
 # Start the Discord bot
-/Volumes/T7/code/github/tcotav/aircbot/venv/bin/python simple_discord_bot.py
+$(dirname "$0")/venv/bin/python simple_discord_bot.py
