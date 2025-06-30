@@ -1,16 +1,17 @@
 # AircBot
 
-An intelligent IRC bot that automatically saves shared links and provides natural language interaction through LLM integration. Features smart link management, conversational AI responses, and comprehensive performance monitoring.
+An intelligent IRC/Discord bot that automatically saves shared links and provides natural language interaction through LLM integration. Features smart link management, conversational AI responses, and comprehensive performance monitoring.
 
 ## Features
 
-- **Automatic Link Detection**: Connects to IRC channels and monitors messages for links
+- **Multi-Platform Support**: Works on both IRC and Discord
+- **Automatic Link Detection**: Monitors channels for links and saves them automatically
 - **Link Metadata**: Automatically fetches and stores link titles and descriptions  
 - **Smart Deduplication**: Avoids saving duplicate links
 - **Command Interface**: Traditional !commands for link management
-- **Natural Language**: Responds to natural mentions like "bubba, show me the links"
+- **Natural Language**: Responds to natural mentions and direct messages
 - **LLM Integration**: Answers questions using locally hosted LLM (Ollama/OpenAI-compatible)
-- **Smart Response Validation**: Filters complex responses for IRC-appropriate simple answers
+- **Smart Response Validation**: Filters complex responses for platform-appropriate simple answers
 - **Intelligent Retry Logic**: Automatically retries empty LLM responses (configurable attempts)
 - **SSL Support**: Connects to IRC servers with SSL (including self-signed certificates)
 - **Memory System**: Maintains conversation context for better LLM responses
@@ -21,6 +22,7 @@ An intelligent IRC bot that automatically saves shared links and provides natura
 
 ## Quick Start
 
+### IRC Bot
 1. **Install dependencies:**
    ```bash
    ./start.sh  # This will set up everything automatically
@@ -50,6 +52,38 @@ An intelligent IRC bot that automatically saves shared links and provides natura
    ./start.sh  # Or: source venv/bin/activate && python bot.py
    ```
 
+### Discord Bot
+1. **Set up Discord application:**
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Create a new application and bot
+   - Copy the bot token
+   - Enable "Message Content Intent" in Bot settings
+
+2. **Install dependencies:**
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+3. **Configure the bot:**
+   ```bash
+   # Add to your .env file:
+   DISCORD_TOKEN=your_bot_token_here
+   ```
+
+4. **Invite bot to server:**
+   - Generate an invite link with these permissions:
+     - Send Messages
+     - Read Message History
+     - Use Slash Commands (optional)
+   - Invite the bot to your Discord server
+
+5. **Run the Discord bot:**
+   ```bash
+   ./start_discord.sh  # Or: source venv/bin/activate && python simple_discord_bot.py
+   ```
+
 ## Configuration
 
 Edit the `.env` file with your settings:
@@ -62,6 +96,11 @@ Edit the `.env` file with your settings:
 - `IRC_PASSWORD` - Bot's password (if required)
 - `IRC_USE_SSL` - Enable SSL connection (true/false)
 - `IRC_SSL_VERIFY` - Verify SSL certificates (false for self-signed)
+
+### Discord Settings
+- `DISCORD_TOKEN` - Your Discord bot token (required for Discord bot)
+- `DISCORD_GUILD_ID` - Optional: Specific server ID to restrict bot to
+- `DISCORD_CHANNEL_ID` - Optional: Specific channel ID to restrict bot to
 
 ### LLM Settings (for !ask command and mentions)
 
@@ -136,34 +175,34 @@ In fallback mode, the bot will:
 
 ## Commands
 
+Both IRC and Discord versions support the same command set:
+
 ### Traditional Commands
 - `!links` - Show recent links
 - `!links search <term>` - Search saved links by keyword
-- `!links by <user>` - Show links shared by specific user
+- `!links by <user>` - Show links shared by specific user (IRC only)
 - `!links stats` - Show link statistics 
-- `!links details` - Show recent links with timestamps
+- `!links details` - Show recent links with timestamps (IRC only)
 - `!ask <question>` - Ask the LLM a question
-- `!ratelimit` - Show rate limit status  
-- `!performance` - Show LLM performance stats for all enabled services (response times, retry counts, success rates)
-- `!help` - Show help information
+- `!ratelimit` - Show rate limit status (IRC only)
+- `!performance` - Show LLM performance stats (IRC only)
+- `!bothelp` - Show help information (Discord) / `!help` (IRC)
 
-### Natural Language (Bot Mentions)
-You can also mention the bot by name and ask naturally:
+### Natural Language
 
-**Link Requests:**
+**IRC (Bot Mentions):**
+You can mention the bot by name and ask naturally:
 - `bubba, show me the links` → Shows recent links
 - `aircbot what links do you have?` → Shows recent links  
 - `bot search for python links` → Searches for "python"
-- `bubba show me links by john` → Shows john's links
-- `aircbot links stats please` → Shows statistics
-- `bot show detailed links` → Shows links with timestamps
 
-**Questions:**
-- `bubba, what's the weather like?` → Asks LLM
-- `aircbot explain quantum physics` → Asks LLM
-- `bot, how does this work?` → Asks LLM
+**Discord (Direct Mentions):**
+Use @mentions or direct messages:
+- `@aircbot show me the links` → Shows recent links
+- `@aircbot what's the weather like?` → Asks LLM
+- Direct message the bot for private conversations
 
-The bot responds to: `bubba`, `aircbot`, `bot` (case-insensitive, with word boundaries)
+The IRC bot responds to: `bubba`, `aircbot`, `bot` (case-insensitive, with word boundaries)
 
 ## Database Schema
 
@@ -185,12 +224,127 @@ The bot creates two tables:
 - `message` - Message content
 - `timestamp` - When it was sent
 
+## Architecture
+
+### Code Structure
+
+```mermaid
+graph TD
+    A[bot.py - IRC Bot] --> B[Config]
+    C[simple_discord_bot.py - Discord Bot] --> B
+    
+    A --> D[Database]
+    C --> D
+    
+    A --> E[LinkHandler]
+    C --> E
+    
+    A --> F[LLMHandler]
+    C --> F
+    
+    A --> G[RateLimiter]
+    C --> G
+    
+    A --> H[ContextManager]
+    C --> H
+    
+    A --> I[ContentFilter]
+    C --> I
+    
+    F --> J[OpenAI Client]
+    F --> K[Local LLM Client]
+    F --> L[OpenAIRateLimiter]
+    
+    B --> M[Environment Variables]
+    D --> N[SQLite Database]
+    E --> O[Web Scraping]
+    
+    P[Prompts] --> F
+    P --> H
+    
+    style A fill:#e1f5fe
+    style C fill:#e8f5e8
+    style B fill:#fff3e0
+    style D fill:#fce4ec
+    style F fill:#f3e5f5
+```
+
+### Interaction Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant P as Platform (IRC/Discord)
+    participant B as Bot
+    participant RL as RateLimiter
+    participant CF as ContentFilter
+    participant LH as LinkHandler
+    participant LLM as LLMHandler
+    participant DB as Database
+    participant CM as ContextManager
+
+    Note over U,CM: Message Processing Flow
+    
+    U->>P: Sends message with link or command
+    P->>B: Message event received
+    
+    B->>CM: Add message to context
+    B->>DB: Save message (if enabled)
+    
+    alt Message contains command (!ask, !links, etc.)
+        B->>RL: Check rate limit
+        alt Rate limit OK
+            RL-->>B: Allowed
+            alt Command is !ask
+                B->>CF: Filter content
+                CF-->>B: Content approved
+                B->>CM: Get relevant context
+                CM-->>B: Context messages
+                B->>LLM: Ask question with context
+                LLM->>LLM: Try local LLM first
+                alt Local LLM fails (fallback mode)
+                    LLM->>LLM: Try OpenAI
+                end
+                LLM-->>B: Response
+                B->>P: Send AI response
+            else Command is !links
+                B->>DB: Query links
+                DB-->>B: Link results
+                B->>P: Send formatted links
+            end
+        else Rate limited
+            RL-->>B: Denied
+            B->>P: Send rate limit message
+        end
+    else Message contains @mention (Discord) or bot name (IRC)
+        B->>RL: Check rate limit
+        RL-->>B: Allowed
+        B->>CF: Filter content
+        CF-->>B: Content approved
+        B->>LLM: Process as question
+        LLM-->>B: Response
+        B->>P: Send AI response
+    end
+    
+    alt Message contains URLs
+        B->>LH: Extract URLs
+        LH->>LH: Fetch metadata
+        LH-->>B: Title & description
+        B->>DB: Save link
+        DB-->>B: Saved successfully
+        B->>P: Confirm link saved
+    end
+
+    Note over U,CM: All interactions logged and stored
+```
+
 ## Development
 
 The bot is structured in modular components:
 
 ### Core Components
 - `bot.py` - Main IRC bot logic with natural language processing
+- `simple_discord_bot.py` - Discord bot implementation using discord.py
 - `database.py` - Database operations and schema management
 - `link_handler.py` - URL detection and metadata fetching  
 - `llm_handler.py` - LLM integration with validation and retry logic
@@ -247,13 +401,21 @@ This clean structure makes the codebase easier to maintain while ensuring comple
 
 ## Example Usage
 
-### Automatic Link Saving
+### Automatic Link Saving (Both Platforms)
+**IRC:**
 ```
 <user> Check out this cool project: https://github.com/example/repo
 <aircbot> 📎 Saved: Example Repository - A cool project
 ```
 
-### Traditional Commands  
+**Discord:**
+```
+user: Check out this cool project: https://github.com/example/repo
+aircbot: 📎 Saved: Example Repository - A cool project
+```
+
+### Traditional Commands
+**IRC:**
 ```
 <user> !links
 <aircbot> 📚 Recent links:
@@ -265,35 +427,41 @@ This clean structure makes the codebase easier to maintain while ensuring comple
 
 <user> !ask what is python?
 <aircbot> 🤖 Python is a high-level programming language known for its simplicity and readability.
+```
 
-<user> !ratelimit
-<aircbot> ⏱️ Rate Limit Status:
-<aircbot> • Total requests this minute: 3/10
-<aircbot> • Active users: 2
-<aircbot> • user: 1/1 (remaining: 0)
+**Discord:**
+```
+user: !bothelp
+aircbot: 🤖 **AircBot Discord Commands**
 
-<user> !performance
-<aircbot> 📊 LLM Performance Stats (Mode: fallback):
-<aircbot> Local: 12 requests, 91.7% success, avg: 0.8s (range: 0.5s-1.2s)
-<aircbot> OpenAI: 3 requests, 100% success, avg: 1.5s (range: 1.2s-1.8s)
-<aircbot> Overall: 15 total, 2 failed
+**Link Management:**
+• !links - Show recent links
+• !links search <term> - Search for links
+• !links stats - Show link statistics
+
+user: !ask what is python?
+aircbot: 🤖 Python is a high-level programming language known for its simplicity and readability.
 ```
 
 ### Natural Language Mentions
+**IRC:**
 ```
 <user> bubba, what links do you have?
 <aircbot> 📚 Recent links:
 <aircbot> • Example Repository (by user) - https://github.com/example/repo
 
-<user> aircbot search for python links
-<aircbot> 🔍 Search results for 'python':
-<aircbot> • Python Tutorial (by alice) - https://python.org/tutorial
-
 <user> bot, explain machine learning
 <aircbot> 🤖 Machine learning is a subset of AI that enables computers to learn from data.
+```
 
-<user> bubba tell me a joke
-<aircbot> ⏱️ user: Please wait a moment before mentioning me again.
+**Discord:**
+```
+user: @aircbot what links do you have?
+aircbot: 📚 Recent links:
+• Example Repository (by user) - https://github.com/example/repo
+
+user: @aircbot explain machine learning
+aircbot: 🤖 Machine learning is a subset of AI that enables computers to learn from data.
 ```
 
 ### Rate Limiting
@@ -307,4 +475,16 @@ The bot enforces rate limits to prevent spam:
 
 - Python 3.7+
 - Internet connection for fetching link metadata
-- Access to IRC server
+- For IRC: Access to IRC server
+- For Discord: Discord bot token and server permissions
+
+### Platform-Specific Requirements
+
+**IRC:**
+- Access to IRC server (default: irc.libera.chat)
+- Optional: SSL support for secure connections
+
+**Discord:**
+- Discord application and bot token from [Discord Developer Portal](https://discord.com/developers/applications)
+- Bot permissions: Send Messages, Read Message History
+- Message Content Intent enabled in Discord Developer Portal
