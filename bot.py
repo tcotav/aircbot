@@ -724,8 +724,9 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         # Remove bot name mentions to get the actual question/comment
         clean_message = message
-        for pattern in [current_nick, self.config.IRC_NICKNAME.lower(), "aircbot"]:
-            clean_message = clean_message.replace(pattern, "").replace(pattern.title(), "")
+        mention_patterns = [current_nick, self.config.IRC_NICKNAME.lower(), "aircbot"]
+        mention_regex = re.compile(rf'\b(?:{"|".join(map(re.escape, mention_patterns))})\b', re.IGNORECASE)
+        clean_message = mention_regex.sub("", clean_message)
         
         # Clean up punctuation and whitespace
         clean_message = clean_message.strip(" ,:;!?")
