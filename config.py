@@ -13,6 +13,11 @@ class Config:
     IRC_PASSWORD = os.getenv('IRC_PASSWORD', '')
     IRC_SERVER_PASSWORD = os.getenv('IRC_SERVER_PASSWORD', '')
     
+    # Discord Settings
+    DISCORD_TOKEN = os.getenv('DISCORD_TOKEN', '')
+    DISCORD_GUILD_ID = os.getenv('DISCORD_GUILD_ID', '')  # Optional: specific server ID
+    DISCORD_CHANNEL_ID = os.getenv('DISCORD_CHANNEL_ID', '')  # Optional: specific channel ID
+    
     # SSL Settings
     IRC_USE_SSL = os.getenv('IRC_USE_SSL', 'false').lower() == 'true'
     IRC_SSL_VERIFY = os.getenv('IRC_SSL_VERIFY', 'true').lower() == 'true'
@@ -70,3 +75,12 @@ class Config:
     WEIGHT_BOT_INTERACTION = float(os.getenv('WEIGHT_BOT_INTERACTION', '0.1'))  # Command/mention bonus
     WEIGHT_URL_BONUS = float(os.getenv('WEIGHT_URL_BONUS', '0.2'))  # URL/link bonus
     PENALTY_SHORT_MESSAGE = float(os.getenv('PENALTY_SHORT_MESSAGE', '0.7'))  # Multiplier for short messages
+
+    # Content Filter Settings
+    CONTENT_FILTER_ENABLED = os.getenv('CONTENT_FILTER_ENABLED', 'true').lower() == 'true'
+    CONTENT_FILTER_LLM_ASSIST = os.getenv('CONTENT_FILTER_LLM_ASSIST', 'true').lower() == 'true'
+    CONTENT_FILTER_LOG_BLOCKED = os.getenv('CONTENT_FILTER_LOG_BLOCKED', 'true').lower() == 'true'
+    CONTENT_FILTER_MAX_MESSAGE_LENGTH = int(os.getenv('CONTENT_FILTER_MAX_MESSAGE_LENGTH', '1000'))
+    CONTENT_FILTER_STRICT_MODE = os.getenv('CONTENT_FILTER_STRICT_MODE', 'false').lower() == 'true'
+    CONTENT_FILTER_BLOCK_PII = os.getenv('CONTENT_FILTER_BLOCK_PII', 'true').lower() == 'true'
+    CONTENT_FILTER_BLOCK_EXCESSIVE_CAPS = os.getenv('CONTENT_FILTER_BLOCK_EXCESSIVE_CAPS', 'true').lower() == 'true'
