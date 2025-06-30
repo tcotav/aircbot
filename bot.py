@@ -696,7 +696,6 @@ class AircBot(irc.bot.SingleServerIRCBot):
             rf'\b{re.escape(current_nick)}\b',  # Current nick with word boundaries
             rf'\b{re.escape(self.config.IRC_NICKNAME.lower())}\b',  # Original configured name
             r'\baircbot\b',  # Bot name with word boundaries
-            r'\bbot\b',  # Generic bot reference with word boundaries
         ]
         
         # Check if any of the patterns appear in the message
@@ -725,7 +724,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         # Remove bot name mentions to get the actual question/comment
         clean_message = message
-        for pattern in [current_nick, self.config.IRC_NICKNAME.lower(), "aircbot", "bot"]:
+        for pattern in [current_nick, self.config.IRC_NICKNAME.lower(), "aircbot"]:
             clean_message = clean_message.replace(pattern, "").replace(pattern.title(), "")
         
         # Clean up punctuation and whitespace
