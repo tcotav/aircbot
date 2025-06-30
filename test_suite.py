@@ -53,7 +53,6 @@ def is_bot_mentioned(message: str, bot_nick: str = "bubba") -> bool:
     mention_patterns = [
         rf'\b{re.escape(bot_nick.lower())}\b',
         r'\baircbot\b',
-        r'\bbot\b',
     ]
     
     for pattern in mention_patterns:
@@ -68,12 +67,12 @@ def test_mention_detection():
     test_cases = [
         ("Hey bubba, what's the weather?", True),
         ("bubba can you help me?", True),
-        ("I think the bot is broken", True),
+        ("I think the bot is broken", False),
         ("aircbot please explain this", True),
         ("Just chatting with friends", False),
         ("BUBBA: what time is it?", True),
         ("Is the AircBot working?", True),
-        ("Bot, tell me a joke", True),
+        ("Bot, tell me a joke", False),
         ("This is just a normal message", False),
         ("The robot is cool", False),
     ]
