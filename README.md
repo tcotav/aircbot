@@ -18,6 +18,7 @@ An intelligent IRC/Discord bot that automatically saves shared links and provide
 - **Rate Limiting**: Prevents spam with configurable per-user and total request limits
 - **Performance Monitoring**: Tracks LLM response times and success rates
 - **Robust Logging**: Detailed connection and error logging without channel spam
+- **Privacy Protection**: Advanced privacy filter that anonymizes usernames and removes PII before sending context to LLMs
 - **Comprehensive Testing**: Clean test suite with full coverage of all functionality
 
 ## Quick Start
@@ -83,6 +84,19 @@ An intelligent IRC/Discord bot that automatically saves shared links and provide
    ```bash
    ./start_discord.sh  # Or: source venv/bin/activate && python simple_discord_bot.py
    ```
+
+## Privacy Protection
+
+AircBot includes an advanced privacy filter to protect user information when sending conversation context to LLMs. The privacy filter:
+
+- **Anonymizes usernames** while preserving conversation flow
+- **Removes PII** including emails, phone numbers, IPs, SSNs, and credit cards
+- **Handles mentions and addressing** (e.g., "@john" becomes "@user_1")
+- **Preserves common words** to avoid breaking normal conversation
+- **Optimizes for channel size** with configurable performance thresholds
+- **Maintains conversation context** so LLMs can still provide relevant responses
+
+The privacy filter is enabled by default and works transparently. For complete documentation, configuration options, and examples, see the **[Privacy Filter Guide](PRIVACY_FILTER_GUIDE.md)**.
 
 ## Configuration
 
@@ -173,6 +187,12 @@ In fallback mode, the bot will:
 - `RATE_LIMIT_USER_PER_MINUTE` - Max requests per user per minute (default: 1)
 - `RATE_LIMIT_TOTAL_PER_MINUTE` - Max total requests per minute (default: 10)
 
+### Privacy Protection
+- `PRIVACY_FILTER_ENABLED` - Enable privacy filtering for LLM context (default: true)
+- `PRIVACY_CHANNEL_SIZE_THRESHOLD` - Max channel size for full privacy filtering (default: 50)
+- `PRIVACY_PRESERVE_COMMON_WORDS` - Preserve common words when anonymizing (default: true)
+- `PRIVACY_USERNAME_PREFIX` - Prefix for anonymized usernames (default: "user_")
+
 ## Commands
 
 Both IRC and Discord versions support the same command set:
@@ -184,6 +204,9 @@ Both IRC and Discord versions support the same command set:
 - `!links stats` - Show link statistics 
 - `!links details` - Show recent links with timestamps (IRC only)
 - `!ask <question>` - Ask the LLM a question
+- `!privacy` - Show privacy filter status
+- `!privacy test <message>` - Test privacy filter on a message
+- `!privacy clear` - Clear your anonymization mappings (admin only)
 - `!ratelimit` - Show rate limit status (IRC only)
 - `!performance` - Show LLM performance stats (IRC only)
 - `!bothelp` - Show help information (Discord) / `!help` (IRC)
@@ -206,7 +229,7 @@ The IRC bot responds to: `bubba`, `aircbot`, `bot` (case-insensitive, with word 
 
 ## Database Schema
 
-The bot creates two tables:
+The bot creates these tables:
 
 ### links
 - `id` - Primary key
@@ -223,6 +246,17 @@ The bot creates two tables:
 - `channel` - Channel name
 - `message` - Message content
 - `timestamp` - When it was sent
+
+### user_mappings (privacy)
+- `real_username` - Original username
+- `anonymous_id` - Anonymized identifier
+- `channel` - Channel context
+- `created_at` - Mapping creation time
+
+### channel_users (privacy)
+- `channel` - Channel name
+- `username` - User in channel
+- `last_seen` - Last activity timestamp
 
 ## Architecture
 
@@ -251,9 +285,15 @@ graph TD
     A --> I[ContentFilter]
     C --> I
     
+    A --> Q[PrivacyFilter]
+    C --> Q
+    
     F --> J[OpenAI Client]
     F --> K[Local LLM Client]
     F --> L[OpenAIRateLimiter]
+    
+    H --> Q
+    Q --> D
     
     B --> M[Environment Variables]
     D --> N[SQLite Database]
@@ -264,6 +304,10 @@ graph TD
     
     style A fill:#e1f5fe
     style C fill:#e8f5e8
+    style B fill:#fff3e0
+    style D fill:#fce4ec
+    style F fill:#f3e5f5
+    style Q fill:#f1f8e9
     style B fill:#fff3e0
     style D fill:#fce4ec
     style F fill:#f3e5f5
@@ -348,6 +392,8 @@ The bot is structured in modular components:
 - `database.py` - Database operations and schema management
 - `link_handler.py` - URL detection and metadata fetching  
 - `llm_handler.py` - LLM integration with validation and retry logic
+- `privacy_filter.py` - Privacy protection and user anonymization
+- `context_manager.py` - Conversation context management with privacy integration
 - `rate_limiter.py` - Rate limiting functionality
 - `config.py` - Configuration management
 - `prompts.py` - LLM prompts and response templates
@@ -462,6 +508,33 @@ aircbot: 📚 Recent links:
 
 user: @aircbot explain machine learning
 aircbot: 🤖 Machine learning is a subset of AI that enables computers to learn from data.
+```
+
+### Privacy Protection
+The privacy filter automatically protects user information:
+
+**IRC:**
+```
+<john_doe> Check out my email john.doe@company.com for updates
+<alice_smith> @john_doe sounds good, I'll email you at alice@example.org
+
+<user> !ask What did john say about email?
+<aircbot> 🤖 user_1 mentioned sharing an email address for updates. user_2 said they would send an email as well.
+```
+
+**Discord:**
+```
+user: !privacy test Contact me at (555) 123-4567 or my GitHub @john_doe
+aircbot: 🔒 **Privacy Filter Test:**
+**Original:** Contact me at (555) 123-4567 or my GitHub @john_doe
+**Filtered:** Contact me at [PHONE_REDACTED] or my GitHub @user_1
+
+user: !privacy
+aircbot: 🔒 **Privacy Filter Status:**
+✅ Privacy filtering: **ENABLED**
+📊 Channel size: 12 users (threshold: 50)
+🔄 Full filtering mode active
+📝 Anonymized users: 5
 ```
 
 ### Rate Limiting

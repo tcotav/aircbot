@@ -84,3 +84,11 @@ class Config:
     CONTENT_FILTER_STRICT_MODE = os.getenv('CONTENT_FILTER_STRICT_MODE', 'false').lower() == 'true'
     CONTENT_FILTER_BLOCK_PII = os.getenv('CONTENT_FILTER_BLOCK_PII', 'true').lower() == 'true'
     CONTENT_FILTER_BLOCK_EXCESSIVE_CAPS = os.getenv('CONTENT_FILTER_BLOCK_EXCESSIVE_CAPS', 'true').lower() == 'true'
+
+    # Privacy Filter Settings
+    PRIVACY_FILTER_ENABLED = os.getenv('PRIVACY_FILTER_ENABLED', 'true').lower() == 'true'
+    PRIVACY_LEVEL = os.getenv('PRIVACY_LEVEL', 'medium')  # none, low, medium, high, paranoid
+    PRIVACY_MAX_CHANNEL_USERS = int(os.getenv('PRIVACY_MAX_CHANNEL_USERS', '20'))  # Skip privacy for large channels
+    PRIVACY_USERNAME_ANONYMIZATION = os.getenv('PRIVACY_USERNAME_ANONYMIZATION', 'true').lower() == 'true'
+    PRIVACY_PII_DETECTION = os.getenv('PRIVACY_PII_DETECTION', 'true').lower() == 'true'
+    PRIVACY_PRESERVE_CONVERSATION_FLOW = os.getenv('PRIVACY_PRESERVE_CONVERSATION_FLOW', 'true').lower() == 'true'

@@ -8,8 +8,15 @@ import time
 import re
 from collections import deque
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Set
 import logging
+
+# Import privacy filter if available
+try:
+    from privacy_filter import PrivacyFilter, PrivacyConfig
+    PRIVACY_AVAILABLE = True
+except ImportError:
+    PRIVACY_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +37,19 @@ class ContextManager:
         self.config = config
         # Channel -> deque of Message objects
         self.message_queues: Dict[str, deque] = {}
+        
+        # Initialize privacy filter if enabled and available
+        self.privacy_filter = None
+        if PRIVACY_AVAILABLE and hasattr(config, 'PRIVACY_FILTER_ENABLED') and config.PRIVACY_FILTER_ENABLED:
+            privacy_config = PrivacyConfig(
+                max_channel_users=getattr(config, 'PRIVACY_MAX_CHANNEL_USERS', 20),
+                username_anonymization=getattr(config, 'PRIVACY_USERNAME_ANONYMIZATION', True),
+                pii_detection=getattr(config, 'PRIVACY_PII_DETECTION', True),
+                preserve_conversation_flow=getattr(config, 'PRIVACY_PRESERVE_CONVERSATION_FLOW', True),
+                privacy_level=getattr(config, 'PRIVACY_LEVEL', 'medium')
+            )
+            self.privacy_filter = PrivacyFilter(privacy_config)
+            logger.info(f"Privacy filter initialized with level: {privacy_config.privacy_level}")
         
         # Compile regex patterns for efficiency
         self._question_patterns = [
@@ -233,10 +253,21 @@ class ContextManager:
             self.message_queues[channel].clear()
             logger.info(f"Cleared message context for channel {channel}")
     
+    def get_channel_users(self, channel: str) -> Set[str]:
+        """Get all known users from the channel's message queue"""
+        if channel not in self.message_queues:
+            return set()
+        
+        return {msg.user for msg in self.message_queues[channel]}
+    
     def format_context_for_llm(self, messages: List[Message]) -> str:
-        """Format a list of messages for inclusion in LLM context"""
+        """Format a list of messages for inclusion in LLM context with privacy protection"""
         if not messages:
             return ""
+        
+        # Get channel and known users for privacy filtering
+        channel = messages[0].channel if messages else ""
+        known_users = {msg.user for msg in messages}
         
         formatted_lines = []
         formatted_lines.append("Recent conversation context:")
@@ -252,6 +283,15 @@ class ContextManager:
                 hours = int(age_minutes / 60)
                 time_str = f"{hours}h ago"
             
+            # Apply privacy filtering if enabled
+            if self.privacy_filter:
+                sanitized_content, anonymous_username = self.privacy_filter.sanitize_for_llm(
+                    msg.content, msg.user, channel, known_users
+                )
+            else:
+                sanitized_content = msg.content
+                anonymous_username = msg.user
+            
             # Add context indicators
             indicators = []
             if msg.is_command:
@@ -261,6 +301,15 @@ class ContextManager:
             
             indicator_str = f" [{','.join(indicators)}]" if indicators else ""
             
-            formatted_lines.append(f"[{time_str}] {msg.user}{indicator_str}: {msg.content}")
+            formatted_lines.append(f"[{time_str}] {anonymous_username}{indicator_str}: {sanitized_content}")
         
         return "\n".join(formatted_lines)
+    
+    def get_privacy_stats(self, channel: str) -> Dict:
+        """Get privacy statistics for a channel"""
+        if not self.privacy_filter:
+            return {"privacy_enabled": False}
+        
+        stats = self.privacy_filter.get_privacy_stats(channel)
+        stats["privacy_enabled"] = True
+        return stats

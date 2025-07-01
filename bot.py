@@ -10,6 +10,7 @@ import irc.connection
 import ssl
 import logging
 import sys
+import re
 from threading import Thread
 import time
 
@@ -288,6 +289,27 @@ class AircBot(irc.bot.SingleServerIRCBot):
             self.show_audit_stats(connection, target_channel)
             if use_private:
                 connection.privmsg(channel, f"📩 Sent audit stats to {user} via private message.")
+        
+        elif command == 'privacy':
+            # Show privacy filter statistics and controls
+            use_private = self.config.COMMANDS_USE_PRIVATE_MSG and not is_private
+            target_channel = channel if not use_private else user
+            
+            if not args:
+                # Show privacy stats
+                self.show_privacy_stats(connection, target_channel, channel)
+                if use_private:
+                    connection.privmsg(channel, f"📩 Sent privacy stats to {user} via private message.")
+            elif args[0] == 'test' and len(args) > 1:
+                # Test privacy filtering on a sample message
+                sample_content = ' '.join(args[1:])
+                self.test_privacy_filtering(connection, target_channel, channel, user, sample_content)
+                if use_private:
+                    connection.privmsg(channel, f"📩 Sent privacy test results to {user} via private message.")
+            elif args[0] == 'clear':
+                # Clear privacy mappings for this channel (admin feature)
+                self.clear_privacy_data(connection, channel)
+                connection.privmsg(channel, f"🧹 Privacy data cleared for {channel} (if any)")
     
     def process_links(self, connection, channel, user, message):
         """Extract and save links from messages"""
@@ -401,10 +423,14 @@ class AircBot(irc.bot.SingleServerIRCBot):
             "!ratelimit - Show rate limit status",
             "!performance - Show LLM performance stats",
             "!audit - Show content filter audit statistics",
+            "!privacy - Show privacy filter statistics",
+            "!privacy test <message> - Test privacy filtering",
+            "!privacy clear - Clear privacy mappings",
             "!help - Show this help",
             "I automatically save any links you share!",
             "💡 I now use smart context analysis for better AI responses!",
             "🛡️ Content filtering protects against inappropriate messages!",
+            "🔒 Privacy filtering protects user information sent to LLMs!",
             f"📩 Most commands send responses privately{' (disabled)' if not self.config.COMMANDS_USE_PRIVATE_MSG else ''}",
             f"💬 !ask responses stay public for community benefit",
             f"💬 You can also message me directly for private conversations{' (disabled)' if not self.config.PRIVATE_MSG_ENABLED else ''}",
@@ -702,7 +728,6 @@ class AircBot(irc.bot.SingleServerIRCBot):
     
     def is_bot_mentioned(self, message: str) -> bool:
         """Check if the bot is mentioned in the message"""
-        import re
         message_lower = message.lower()
         
         # Get the current nickname (might have _ appended if original was taken)
@@ -975,6 +1000,69 @@ class AircBot(irc.bot.SingleServerIRCBot):
         except Exception as e:
             logger.error(f"Error showing audit stats: {e}")
             connection.privmsg(channel, "❌ Error retrieving audit statistics.")
+    
+    def show_privacy_stats(self, connection, channel, source_channel):
+        """Show privacy filter statistics"""
+        try:
+            privacy_stats = self.context_manager.get_privacy_stats(source_channel)
+            
+            if not privacy_stats["privacy_enabled"]:
+                connection.privmsg(channel, "🔒 Privacy filtering is not enabled.")
+                return
+            
+            connection.privmsg(channel, f"🔒 Privacy Stats for {source_channel}:")
+            connection.privmsg(channel, f"• Privacy Level: {privacy_stats.get('privacy_level', 'unknown')}")
+            connection.privmsg(channel, f"• Active Users: {privacy_stats.get('active_users', 0)}")
+            connection.privmsg(channel, f"• Mapped Users: {privacy_stats.get('mapped_users', 0)}")
+            connection.privmsg(channel, f"• Max Channel Size: {privacy_stats.get('max_channel_users', 0)}")
+            
+            privacy_applied = privacy_stats.get('privacy_applied', False)
+            status = "✅ Applied" if privacy_applied else "⚠️ Skipped (channel too large)"
+            connection.privmsg(channel, f"• Privacy Status: {status}")
+            
+        except Exception as e:
+            logger.error(f"Error showing privacy stats: {e}")
+            connection.privmsg(channel, "❌ Error retrieving privacy statistics.")
+    
+    def test_privacy_filtering(self, connection, channel, source_channel, requesting_user, sample_content):
+        """Test the privacy filtering on a sample message"""
+        try:
+            if not self.context_manager.privacy_filter:
+                connection.privmsg(channel, "🔒 Privacy filtering is not enabled.")
+                return
+            
+            # Get known users from the channel
+            known_users = self.context_manager.get_channel_users(source_channel)
+            
+            # Test the privacy filter
+            sanitized_content, anon_username = self.context_manager.privacy_filter.sanitize_for_llm(
+                sample_content, requesting_user, source_channel, known_users
+            )
+            
+            connection.privmsg(channel, f"🔒 Privacy Filter Test for {source_channel}:")
+            connection.privmsg(channel, f"• Original: {sample_content}")
+            connection.privmsg(channel, f"• Sanitized: {sanitized_content}")
+            connection.privmsg(channel, f"• Your username: {requesting_user} → {anon_username}")
+            connection.privmsg(channel, f"• Known users in channel: {len(known_users)}")
+            
+        except Exception as e:
+            logger.error(f"Error testing privacy filter: {e}")
+            connection.privmsg(channel, "❌ Error testing privacy filter.")
+    
+    def clear_privacy_data(self, connection, channel):
+        """Clear privacy mappings for a channel"""
+        try:
+            if not self.context_manager.privacy_filter:
+                connection.privmsg(channel, "🔒 Privacy filtering is not enabled.")
+                return
+            
+            self.context_manager.privacy_filter.clear_channel_data(channel)
+            connection.privmsg(channel, f"🧹 Privacy data cleared for {channel}")
+            logger.info(f"Privacy data cleared for {channel}")
+            
+        except Exception as e:
+            logger.error(f"Error clearing privacy data: {e}")
+            connection.privmsg(channel, "❌ Error clearing privacy data.")
 
 def main():
     """Main entry point"""
