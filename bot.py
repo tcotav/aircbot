@@ -82,8 +82,6 @@ class AircBot(irc.bot.SingleServerIRCBot):
         
         if nick == self.config.IRC_NICKNAME:
             logger.info(f"Successfully joined {channel}")
-            # Send a greeting message
-            connection.privmsg(channel, "🤖 AircBot is online!")
     
     def on_pubmsg(self, connection, event):
         """Called when a public message is received in a channel"""
@@ -171,6 +169,25 @@ class AircBot(irc.bot.SingleServerIRCBot):
         except Exception as e:
             logger.error(f"Error in private conversation with {user}: {e}")
             connection.privmsg(user, "❌ Something went wrong. Please try again later.")
+    
+    def _should_use_private_message(self, is_private):
+        """Determine if we should use private messaging for links commands"""
+        # If the command is already in a private message, don't switch to private
+        # If the command is in a channel and private messaging is enabled, use private
+        return self.config.LINKS_USE_PRIVATE_MSG and not is_private
+    
+    def _get_source_channel(self, channel, requesting_user=None):
+        """Determine the source channel for link operations"""
+        # If requesting_user is provided, we're sending to them privately about a channel
+        # If channel is a user (private message), always use the configured IRC channel
+        if requesting_user or channel == requesting_user or not channel.startswith('#'):
+            return self.config.IRC_CHANNEL
+        else:
+            return channel
+    
+    def _is_private_context(self, channel, requesting_user=None):
+        """Check if we're in a private message context"""
+        return requesting_user or not channel.startswith('#')
     
     def handle_command(self, connection, channel, user, message, is_private=False):
         """Handle bot commands with rate limiting"""
@@ -309,19 +326,19 @@ class AircBot(irc.bot.SingleServerIRCBot):
     
     def show_recent_links(self, connection, channel, requesting_user=None):
         """Show recent links in the channel"""
-        # If requesting_user is provided, we're sending to them privately about a channel
-        source_channel = channel if not requesting_user else self.config.IRC_CHANNEL
+        source_channel = self._get_source_channel(channel, requesting_user)
+        is_private_context = self._is_private_context(channel, requesting_user)
         links = self.db.get_recent_links(source_channel, limit=5)
         
         if not links:
             msg = "No links saved yet!"
-            if requesting_user:
+            if is_private_context:
                 msg = f"No links saved in {source_channel} yet!"
             connection.privmsg(channel, msg)
             return
         
         intro_msg = "📚 Recent links:"
-        if requesting_user:
+        if is_private_context:
             intro_msg = f"📚 Recent links from {source_channel}:"
         connection.privmsg(channel, intro_msg)
         for link in links:
@@ -332,19 +349,19 @@ class AircBot(irc.bot.SingleServerIRCBot):
     
     def search_links(self, connection, channel, query, requesting_user=None):
         """Search for links matching a query"""
-        # If requesting_user is provided, we're sending to them privately about a channel
-        source_channel = channel if not requesting_user else self.config.IRC_CHANNEL
+        source_channel = self._get_source_channel(channel, requesting_user)
+        is_private_context = self._is_private_context(channel, requesting_user)
         links = self.db.search_links(source_channel, query, limit=3)
         
         if not links:
             msg = f"No links found matching '{query}'"
-            if requesting_user:
+            if is_private_context:
                 msg = f"No links found in {source_channel} matching '{query}'"
             connection.privmsg(channel, msg)
             return
         
         intro_msg = f"🔍 Search results for '{query}':"
-        if requesting_user:
+        if is_private_context:
             intro_msg = f"🔍 Search results from {source_channel} for '{query}':"
         connection.privmsg(channel, intro_msg)
         for link in links:
@@ -355,12 +372,12 @@ class AircBot(irc.bot.SingleServerIRCBot):
     
     def show_stats(self, connection, channel, requesting_user=None):
         """Show link statistics"""
-        # If requesting_user is provided, we're sending to them privately about a channel
-        source_channel = channel if not requesting_user else self.config.IRC_CHANNEL
+        source_channel = self._get_source_channel(channel, requesting_user)
+        is_private_context = self._is_private_context(channel, requesting_user)
         stats = self.db.get_link_stats(source_channel)
         
         msg = f"📊 Stats"
-        if requesting_user:
+        if is_private_context:
             msg += f" for {source_channel}"
         msg += f": {stats.get('total_links', 0)} links saved by {stats.get('unique_users', 0)} users"
         if 'top_contributor' in stats:
@@ -507,19 +524,19 @@ class AircBot(irc.bot.SingleServerIRCBot):
     
     def show_detailed_links(self, connection, channel, requesting_user=None):
         """Show recent links with detailed information (user, timestamp)"""
-        # If requesting_user is provided, we're sending to them privately about a channel
-        source_channel = channel if not requesting_user else self.config.IRC_CHANNEL
+        source_channel = self._get_source_channel(channel, requesting_user)
+        is_private_context = self._is_private_context(channel, requesting_user)
         links = self.db.get_links_with_details(source_channel, limit=5)
         
         if not links:
             msg = "No links saved yet!"
-            if requesting_user:
+            if is_private_context:
                 msg = f"No links saved in {source_channel} yet!"
             connection.privmsg(channel, msg)
             return
         
         intro_msg = "📚 Recent links (with details):"
-        if requesting_user:
+        if is_private_context:
             intro_msg = f"📚 Recent links from {source_channel} (with details):"
         connection.privmsg(channel, intro_msg)
         for link in links:
@@ -538,19 +555,19 @@ class AircBot(irc.bot.SingleServerIRCBot):
     
     def show_links_by_user(self, connection, channel, username, requesting_user=None):
         """Show all links shared by a specific user"""
-        # If requesting_user is provided, we're sending to them privately about a channel
-        source_channel = channel if not requesting_user else self.config.IRC_CHANNEL
+        source_channel = self._get_source_channel(channel, requesting_user)
+        is_private_context = self._is_private_context(channel, requesting_user)
         links = self.db.get_all_links_by_user(source_channel, username)
         
         if not links:
             msg = f"No links found from user '{username}'"
-            if requesting_user:
+            if is_private_context:
                 msg += f" in {source_channel}"
             connection.privmsg(channel, msg)
             return
         
         intro_msg = f"🔍 Links shared by {username}:"
-        if requesting_user:
+        if is_private_context:
             intro_msg = f"🔍 Links shared by {username} in {source_channel}:"
         connection.privmsg(channel, intro_msg)
         for link in links[:3]:  # Limit to 3 to avoid spam
