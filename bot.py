@@ -10,7 +10,6 @@ import irc.connection
 import ssl
 import logging
 import sys
-import re
 from threading import Thread
 import time
 
