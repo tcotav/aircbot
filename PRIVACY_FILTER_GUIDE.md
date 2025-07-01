@@ -42,6 +42,9 @@ PRIVACY_MAX_CHANNEL_USERS=20                   # Skip privacy for large channels
 PRIVACY_USERNAME_ANONYMIZATION=true            # Anonymize usernames
 PRIVACY_PII_DETECTION=true                     # Detect and replace PII
 PRIVACY_PRESERVE_CONVERSATION_FLOW=true        # Try to maintain addressing context
+
+# Admin Settings (for privacy clear command)
+ADMIN_USERS=admin1,admin2,admin3               # Comma-separated list of admin usernames
 ```
 
 ### Privacy Levels
@@ -75,11 +78,20 @@ Test privacy filtering on a sample message:
 • Known users in channel: 5
 ```
 
-### `!privacy clear`
-Clear privacy mappings for the channel (admin feature):
+### `!privacy clear` (Admin Only)
+Clear privacy mappings for the channel. **Requires administrator privileges**.
+
+**Admin users can clear data:**
 ```
 🧹 Privacy data cleared for #dev
 ```
+
+**Non-admin users see an error:**
+```
+❌ regular_user: Only bot administrators can clear privacy data.
+```
+
+**Configuration**: Set admin users with `ADMIN_USERS=admin1,admin2,admin3` in your `.env` file. If not specified, the bot nickname becomes the default admin.
 
 ## Example Scenarios
 
@@ -196,10 +208,28 @@ The privacy filter is designed to be:
 - **Performant**: Minimal impact on bot response times
 - **Transparent**: Clear visibility into what's being protected
 
+## Testing & Demonstration
+
+To see the privacy filter in action:
+
+```bash
+# Interactive demonstration with examples
+python demo.py
+
+# Comprehensive privacy unit tests  
+python test_privacy_filter.py
+
+# Full integration tests
+python test_suite.py
+```
+
+The demo script shows real-world scenarios including username anonymization, PII replacement, conversation preservation, and admin authorization.
+
 ## Support
 
 For issues or questions:
-1. Check the test output for validation
-2. Use `!privacy` commands to verify operation
-3. Adjust `PRIVACY_LEVEL` and `PRIVACY_MAX_CHANNEL_USERS` as needed
-4. Review logs for performance impact and privacy bypass notifications
+1. Run `python demo.py` to see examples of expected behavior
+2. Check the test output for validation
+3. Use `!privacy` commands to verify operation
+4. Adjust `PRIVACY_LEVEL` and `PRIVACY_MAX_CHANNEL_USERS` as needed
+5. Review logs for performance impact and privacy bypass notifications

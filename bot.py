@@ -190,6 +190,11 @@ class AircBot(irc.bot.SingleServerIRCBot):
         """Check if we're in a private message context"""
         return requesting_user or not channel.startswith('#')
     
+    def is_admin(self, user: str) -> bool:
+        """Check if a user has admin privileges"""
+        # Check if user is in the admin list
+        return user in self.config.ADMIN_USERS
+    
     def handle_command(self, connection, channel, user, message, is_private=False):
         """Handle bot commands with rate limiting"""
         # Check rate limit
@@ -308,6 +313,11 @@ class AircBot(irc.bot.SingleServerIRCBot):
                     connection.privmsg(channel, f"📩 Sent privacy test results to {user} via private message.")
             elif args[0] == 'clear':
                 # Clear privacy mappings for this channel (admin feature)
+                if not self.is_admin(user):
+                    connection.privmsg(channel, f"❌ {user}: Only bot administrators can clear privacy data.")
+                    logger.warning(f"Non-admin user {user} attempted to clear privacy data")
+                    return
+                
                 self.clear_privacy_data(connection, channel)
                 connection.privmsg(channel, f"🧹 Privacy data cleared for {channel} (if any)")
     
@@ -425,7 +435,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
             "!audit - Show content filter audit statistics",
             "!privacy - Show privacy filter statistics",
             "!privacy test <message> - Test privacy filtering",
-            "!privacy clear - Clear privacy mappings",
+            "!privacy clear - Clear privacy mappings (admin only)",
             "!help - Show this help",
             "I automatically save any links you share!",
             "💡 I now use smart context analysis for better AI responses!",

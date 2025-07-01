@@ -46,6 +46,8 @@ An intelligent IRC/Discord bot that automatically saves shared links and provide
    python test_suite.py          # Run main integration tests
    python test_validation.py     # Run LLM validation tests
    python test_performance.py    # Run performance tests (add --real-llm for actual LLM tests)
+   python test_privacy_filter.py # Run privacy filter unit tests
+   python demo.py                # Run interactive demo of privacy & admin features
    ```
 
 4. **Run the bot:**
@@ -193,6 +195,9 @@ In fallback mode, the bot will:
 - `PRIVACY_PRESERVE_COMMON_WORDS` - Preserve common words when anonymizing (default: true)
 - `PRIVACY_USERNAME_PREFIX` - Prefix for anonymized usernames (default: "user_")
 
+### Administrative Settings
+- `ADMIN_USERS` - Comma-separated list of admin usernames who can use admin commands (default: bot nickname)
+
 ## Commands
 
 Both IRC and Discord versions support the same command set:
@@ -215,9 +220,8 @@ Both IRC and Discord versions support the same command set:
 
 **IRC (Bot Mentions):**
 You can mention the bot by name and ask naturally:
-- `bubba, show me the links` → Shows recent links
+- `<ircnick>, show me the links` → Shows recent links
 - `aircbot what links do you have?` → Shows recent links  
-- `bot search for python links` → Searches for "python"
 
 **Discord (Direct Mentions):**
 Use @mentions or direct messages:
@@ -225,7 +229,7 @@ Use @mentions or direct messages:
 - `@aircbot what's the weather like?` → Asks LLM
 - Direct message the bot for private conversations
 
-The IRC bot responds to: `bubba`, `aircbot`, `bot` (case-insensitive, with word boundaries)
+The IRC bot responds to: ircnick, `aircbot` (case-insensitive, with word boundaries)
 
 ## Database Schema
 
@@ -400,7 +404,7 @@ The bot is structured in modular components:
 
 ### Testing
 
-The project has a clean, comprehensive test suite organized into 3 focused files:
+The project has a clean, comprehensive test suite organized into focused files:
 
 ```bash
 # Main integration and flow tests
@@ -413,6 +417,7 @@ python test_suite.py
 - LLM response validation
 - Simple list questions (geography, colors, etc.)
 - Complete end-to-end workflows
+- Content filtering and OpenAI integration
 
 ```bash  
 # LLM validation and response processing tests
@@ -435,11 +440,30 @@ python test_performance.py [--real-llm]
 - Bot integration timing
 - Real LLM timing tests (with --real-llm flag)
 
+```bash
+# Privacy filter unit tests
+python test_privacy_filter.py
+```
+- Username anonymization testing
+- PII detection and replacement
+- Conversation flow preservation
+- Performance optimization validation
+- Context manager integration
+
+```bash
+# Interactive demonstration
+python demo.py
+```
+- Privacy filtering demonstrations
+- Admin authorization examples
+- Performance optimization showcase
+- Context integration examples
+
 ### Test Architecture
 
 The test suite has been carefully consolidated for maintainability:
-- **Previous**: 15+ scattered test files (test_*.py, debug_*.py)
-- **Current**: 3 focused, comprehensive test files
+- **Previous**: 15+ scattered test files (test_*.py, debug_*.py, multiple demos)
+- **Current**: 4 focused test files + 1 interactive demo
 - **Coverage**: All functionality preserved with zero redundancy
 - **Organization**: Each file has a clear, distinct purpose
 

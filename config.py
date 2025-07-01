@@ -92,3 +92,10 @@ class Config:
     PRIVACY_USERNAME_ANONYMIZATION = os.getenv('PRIVACY_USERNAME_ANONYMIZATION', 'true').lower() == 'true'
     PRIVACY_PII_DETECTION = os.getenv('PRIVACY_PII_DETECTION', 'true').lower() == 'true'
     PRIVACY_PRESERVE_CONVERSATION_FLOW = os.getenv('PRIVACY_PRESERVE_CONVERSATION_FLOW', 'true').lower() == 'true'
+
+    # Admin Settings
+    # Comma-separated list of admin usernames who can use admin commands
+    ADMIN_USERS = [user.strip() for user in os.getenv('ADMIN_USERS', '').split(',') if user.strip()]
+    # If no admins specified, the bot owner (IRC_NICKNAME) is automatically admin
+    if not ADMIN_USERS and IRC_NICKNAME:
+        ADMIN_USERS = [IRC_NICKNAME]
