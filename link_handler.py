@@ -9,9 +9,10 @@ logger = logging.getLogger(__name__)
 
 class LinkHandler:
     def __init__(self):
-        # Regex pattern to find URLs in messages
+        # Regex pattern to find URLs in messages - improved to handle more cases
         self.url_pattern = re.compile(
-            r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
+            r'https?://[^\s<>"{}|\\^`\[\]]+',
+            re.IGNORECASE
         )
         
         # Headers to mimic a real browser
@@ -22,11 +23,13 @@ class LinkHandler:
     def extract_urls(self, message: str) -> list:
         """Extract all URLs from a message"""
         urls = self.url_pattern.findall(message)
-        # Validate URLs
+        # Clean up and validate URLs
         valid_urls = []
         for url in urls:
-            if validators.url(url):
-                valid_urls.append(url)
+            # Remove trailing punctuation that might have been captured
+            cleaned_url = url.rstrip('.,!;)?]')
+            if validators.url(cleaned_url):
+                valid_urls.append(cleaned_url)
         return valid_urls
     
     def get_link_metadata(self, url: str) -> Tuple[str, str]:
@@ -38,23 +41,30 @@ class LinkHandler:
             response = requests.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
             
-            soup = BeautifulSoup(response.content, 'html.parser')
+            # Handle both .text and .content attributes
+            content = response.text if hasattr(response, 'text') else response.content.decode('utf-8', errors='ignore')
+            soup = BeautifulSoup(content, 'html.parser')
             
             # Get title
-            title = "No title"
+            title = url  # Default fallback to URL
             if soup.title:
-                title = soup.title.string.strip()
+                if soup.title.string:
+                    title = soup.title.string.strip()
+                elif soup.title.get_text():
+                    # Handle cases where title has nested tags
+                    title = soup.title.get_text().strip()
+            # If no title found, keep the URL as fallback
             
             # Get description from meta tags
             description = ""
             meta_desc = soup.find('meta', attrs={'name': 'description'})
-            if meta_desc:
+            if meta_desc and hasattr(meta_desc, 'get') and meta_desc.get('content'):
                 description = meta_desc.get('content', '').strip()
             
             # If no meta description, try Open Graph
             if not description:
                 og_desc = soup.find('meta', attrs={'property': 'og:description'})
-                if og_desc:
+                if og_desc and hasattr(og_desc, 'get') and og_desc.get('content'):
                     description = og_desc.get('content', '').strip()
             
             # Limit length
@@ -67,7 +77,7 @@ class LinkHandler:
             
         except requests.exceptions.RequestException as e:
             logger.warning(f"Failed to fetch metadata for {url}: {e}")
-            return "Link", "Could not fetch description"
+            return url, "Could not fetch description"
         except Exception as e:
             logger.error(f"Error processing {url}: {e}")
-            return "Link", "Error processing link"
+            return url, "Error processing link"
