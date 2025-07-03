@@ -1,7 +1,10 @@
 import sqlite3
 import os
+import logging
 from datetime import datetime
 from typing import List, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 class Database:
     def __init__(self, db_path: str):
@@ -9,7 +12,11 @@ class Database:
         # Create data directory if it doesn't exist
         db_dir = os.path.dirname(db_path)
         if db_dir:  # Only create directory if there's a directory component
-            os.makedirs(db_dir, exist_ok=True)
+            try:
+                os.makedirs(db_dir, exist_ok=True)
+            except (OSError, PermissionError) as e:
+                logger.error(f"Cannot create database directory {db_dir}: {e}")
+                raise
         self.init_database()
     
     def init_database(self):
@@ -42,16 +49,34 @@ class Database:
     
     def save_link(self, url: str, title: str, description: str, user: str, channel: str) -> bool:
         """Save a link to the database. Returns True if saved, False if duplicate"""
+        # Add validation for empty URLs
+        if not url or not url.strip():
+            logger.error("Cannot save link: URL is empty")
+            return False
+            
         try:
+            # Truncate very long content to prevent issues
+            if title and len(title) > 500:
+                title = title[:497] + "..."
+            if description and len(description) > 2000:
+                description = description[:1997] + "..."
+                
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute('''
-                    INSERT INTO links (url, title, description, user, channel)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (url, title, description, user, channel))
+                    INSERT INTO links (url, title, description, user, channel, timestamp)
+                    VALUES (?, ?, ?, ?, ?, datetime('now', 'subsec'))
+                ''', (url, title or '', description or '', user, channel))
                 conn.commit()
                 return True
-        except sqlite3.IntegrityError:
-            # Link already exists in this channel
+        except sqlite3.IntegrityError as e:
+            if "UNIQUE constraint failed" in str(e):
+                logger.info(f"Link already exists: {url}")
+                return False
+            else:
+                logger.error(f"Database integrity error saving link: {e}")
+                return False
+        except Exception as e:
+            logger.error(f"Error saving link {url}: {e}")
             return False
     
     def save_message(self, user: str, channel: str, message: str):
@@ -71,7 +96,7 @@ class Database:
                 SELECT url, title, user, timestamp
                 FROM links
                 WHERE channel = ?
-                ORDER BY timestamp DESC
+                ORDER BY timestamp DESC, rowid DESC
                 LIMIT ?
             ''', (channel, limit))
             return [dict(row) for row in cursor.fetchall()]
@@ -145,3 +170,37 @@ class Database:
                 ORDER BY timestamp DESC
             ''', (channel, user))
             return [dict(row) for row in cursor.fetchall()]
+    
+    def get_links_by_user(self, channel: str, user: str, limit: int = 50) -> List[Dict]:
+        """Get links by specific user - alias for get_all_links_by_user with limit"""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute('''
+                SELECT url, title, user, timestamp
+                FROM links
+                WHERE channel = ? AND user = ?
+                ORDER BY timestamp DESC
+                LIMIT ?
+            ''', (channel, user, limit))
+            return [dict(row) for row in cursor.fetchall()]
+    
+    def get_stats(self, channel: str) -> Dict:
+        """Get statistics for a channel - alias for get_link_stats"""
+        stats = self.get_link_stats(channel)
+        
+        # Add top contributors list
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.execute('''
+                SELECT user, COUNT(*) as count
+                FROM links
+                WHERE channel = ?
+                GROUP BY user
+                ORDER BY count DESC
+                LIMIT 5
+            ''', (channel,))
+            
+            contributors = [dict(row) for row in cursor.fetchall()]
+            stats['top_contributors'] = {row['user']: row['count'] for row in contributors}
+            
+        return stats

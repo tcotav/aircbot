@@ -303,14 +303,26 @@ class TestRetryLogic(unittest.TestCase):
         self.config = Config()
         self.config.LLM_RETRY_ATTEMPTS = 3
         self.config.LLM_ENABLED = True
+        self.config.LLM_MODE = 'local_only'
+        self.config.LLM_BASE_URL = 'http://localhost:11434'
+        self.config.LLM_MODEL = 'test-model'
+        self.config.LLM_API_KEY = 'test-key'
+        self.config.OPENAI_ENABLED = False
         
         # Create handler without initialization
         self.handler = LLMHandler.__new__(LLMHandler)
         self.handler.config = self.config
+        self.handler.mode = self.config.LLM_MODE
         self.handler.enabled = True
-        self.handler.response_times = []
-        self.handler.total_requests = 0
-        self.handler.failed_requests = 0
+        
+        # Set up mock local client since we're in local_only mode
+        self.handler.local_client = Mock()
+        self.handler.openai_client = None
+        self.handler.openai_rate_limiter = None
+        
+        self.handler.response_times = {'local': [], 'openai': []}
+        self.handler.total_requests = {'local': 0, 'openai': 0}
+        self.handler.failed_requests = {'local': 0, 'openai': 0}
     
     def test_empty_response_retries(self):
         """Test that empty responses trigger retries"""
@@ -339,8 +351,7 @@ class TestRetryLogic(unittest.TestCase):
                 return MockResponse("Success after retries!")
         
         # Set up mock client
-        self.handler.client = Mock()
-        self.handler.client.chat.completions.create = mock_empty_responses
+        self.handler.local_client.chat.completions.create = mock_empty_responses
         
         result = self.handler.ask_llm("test question")
         
@@ -375,8 +386,7 @@ class TestRetryLogic(unittest.TestCase):
             
             return MockResponse(complex_response)
         
-        self.handler.client = Mock()
-        self.handler.client.chat.completions.create = mock_complex_response
+        self.handler.local_client.chat.completions.create = mock_complex_response
         
         result = self.handler.ask_llm("complex question")
         
@@ -405,8 +415,7 @@ class TestRetryLogic(unittest.TestCase):
             
             return MockResponse("")  # Always empty
         
-        self.handler.client = Mock()
-        self.handler.client.chat.completions.create = mock_always_empty
+        self.handler.local_client.chat.completions.create = mock_always_empty
         
         result = self.handler.ask_llm("test question")
         

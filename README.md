@@ -43,10 +43,8 @@ An intelligent IRC/Discord bot that automatically saves shared links and provide
 
 3. **Test the bot (optional):**
    ```bash
-   python test_suite.py          # Run main integration tests
-   python test_validation.py     # Run LLM validation tests
-   python test_performance.py    # Run performance tests (add --real-llm for actual LLM tests)
-   python test_privacy_filter.py # Run privacy filter unit tests
+   ./run_tests.sh                # Run complete consolidated test suite (recommended)
+   python -m pytest test_consolidated.py -v  # Run tests with verbose output
    python demo.py                # Run interactive demo of privacy & admin features
    ```
 

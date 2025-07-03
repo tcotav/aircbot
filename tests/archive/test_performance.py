@@ -29,10 +29,10 @@ class TestLLMPerformance(unittest.TestCase):
         # Create LLM handler
         self.llm = LLMHandler(self.config)
         
-        # Reset performance stats
-        self.llm.response_times = []
-        self.llm.total_requests = 0
-        self.llm.failed_requests = 0
+        # Reset performance stats to ensure clean state
+        self.llm.response_times = {'local': [], 'openai': []}
+        self.llm.total_requests = {'local': 0, 'openai': 0}
+        self.llm.failed_requests = {'local': 0, 'openai': 0}
     
     def test_performance_statistics_tracking(self):
         """Test that performance statistics are tracked correctly"""
@@ -65,8 +65,9 @@ class TestLLMPerformance(unittest.TestCase):
             return MockResponse(f"Response {call_count}")
         
         # Set up mock client
-        self.llm.client = Mock()
-        self.llm.client.chat.completions.create = mock_timed_response
+        if not hasattr(self.llm, 'local_client') or self.llm.local_client is None:
+            self.llm.local_client = Mock()
+        self.llm.local_client.chat.completions.create = mock_timed_response
         
         # Make several requests
         questions = ["test 1", "test 2", "test 3"]
@@ -75,15 +76,15 @@ class TestLLMPerformance(unittest.TestCase):
             self.assertIsNotNone(result)
         
         # Check statistics
-        stats = self.llm.get_performance_stats()
+        stats = self.llm.get_simple_stats()
         
         self.assertEqual(stats['total_requests'], 3)
         self.assertEqual(stats['failed_requests'], 0)
         self.assertEqual(stats['success_rate'], "100.0%")
-        self.assertEqual(len(self.llm.response_times), 3)
+        self.assertEqual(len(stats['response_times']), 3)
         
         # All response times should be > 0
-        for rt in self.llm.response_times:
+        for rt in stats['response_times']:
             self.assertGreater(rt, 0)
     
     def test_failed_request_tracking(self):
@@ -117,7 +118,7 @@ class TestLLMPerformance(unittest.TestCase):
                 return MockResponse(f"Success {call_count}")
         
         self.llm.client = Mock()
-        self.llm.client.chat.completions.create = mock_mixed_responses
+        self.llm.local_client.chat.completions.create = mock_mixed_responses
         
         # Make several requests
         questions = ["test 1", "test 2"]
@@ -126,8 +127,9 @@ class TestLLMPerformance(unittest.TestCase):
             self.assertIsNotNone(result)
         
         # Check statistics - first call should have failed (3 attempts), second should succeed
-        self.assertGreaterEqual(self.llm.failed_requests, 1)  # At least 1 failure from empty responses
-        self.assertGreaterEqual(self.llm.total_requests, 1)   # At least 1 success
+        stats = self.llm.get_simple_stats()
+        self.assertGreaterEqual(stats['failed_requests'], 1)  # At least 1 failure from empty responses
+        self.assertGreaterEqual(stats['total_requests'], 1)   # At least 1 success
     
     def test_response_time_bounds(self):
         """Test that response times are within reasonable bounds"""
@@ -150,8 +152,8 @@ class TestLLMPerformance(unittest.TestCase):
             
             return MockResponse("Quick response")
         
-        self.llm.client = Mock()
-        self.llm.client.chat.completions.create = mock_fast_response
+        self.llm.local_client = Mock()
+        self.llm.local_client.chat.completions.create = mock_fast_response
         
         start_time = time.time()
         result = self.llm.ask_llm("quick test")
@@ -164,8 +166,9 @@ class TestLLMPerformance(unittest.TestCase):
         self.assertLess(total_time, 1.0)
         
         # Should have recorded timing
-        self.assertGreater(len(self.llm.response_times), 0)
-        self.assertGreater(self.llm.response_times[-1], 0)
+        stats = self.llm.get_simple_stats()
+        self.assertGreater(len(stats['response_times']), 0)
+        self.assertGreater(stats['response_times'][-1], 0)
 
 class TestBotIntegration(unittest.TestCase):
     """Test bot integration and command handling"""
@@ -187,9 +190,9 @@ class TestBotIntegration(unittest.TestCase):
             self.skipTest("LLM not available for testing")
         
         # Set up some mock performance data
-        self.bot.llm_handler.total_requests = 10
-        self.bot.llm_handler.failed_requests = 2
-        self.bot.llm_handler.response_times = [1.0, 1.5, 0.8, 2.0, 1.2]
+        self.bot.llm_handler.total_requests = {'local': 10, 'openai': 0}
+        self.bot.llm_handler.failed_requests = {'local': 2, 'openai': 0}
+        self.bot.llm_handler.response_times = {'local': [1.0, 1.5, 0.8, 2.0, 1.2], 'openai': []}
         
         # Call the performance command
         self.bot.show_performance_stats(self.connection, self.channel)
@@ -203,16 +206,17 @@ class TestBotIntegration(unittest.TestCase):
         stats_text = " ".join(stat_messages)
         
         self.assertIn("Performance Stats", stats_text)
-        self.assertIn("Total requests", stats_text)
-        self.assertIn("Failed requests", stats_text)
-        self.assertIn("Success rate", stats_text)
-        self.assertIn("response time", stats_text)
+        self.assertIn("requests", stats_text)  # Should show "10 requests"
+        self.assertIn("success", stats_text)   # Should show success rate
+        self.assertIn("avg:", stats_text)      # Should show average response time
     
     def test_llm_unavailable_performance_command(self):
         """Test performance command when LLM is unavailable"""
-        # Temporarily disable LLM
-        original_enabled = self.bot.llm_handler.enabled
-        self.bot.llm_handler.enabled = False
+        # Temporarily disable LLM by removing clients
+        original_local = self.bot.llm_handler.local_client
+        original_openai = self.bot.llm_handler.openai_client
+        self.bot.llm_handler.local_client = None
+        self.bot.llm_handler.openai_client = None
         
         try:
             self.bot.show_performance_stats(self.connection, self.channel)
@@ -226,7 +230,8 @@ class TestBotIntegration(unittest.TestCase):
             
         finally:
             # Restore original state
-            self.bot.llm_handler.enabled = original_enabled
+            self.bot.llm_handler.local_client = original_local
+            self.bot.llm_handler.openai_client = original_openai
     
     def test_ask_command_timing(self):
         """Test that ask command processing time is logged"""

@@ -452,6 +452,29 @@ class LLMHandler:
         
         return stats
     
+    def get_simple_stats(self) -> dict:
+        """
+        Get simplified performance statistics for backward compatibility
+        Returns combined stats across all client types
+        """
+        total_requests = sum(self.total_requests.values())
+        failed_requests = sum(self.failed_requests.values())
+        all_response_times = []
+        for times in self.response_times.values():
+            all_response_times.extend(times)
+        
+        if total_requests > 0:
+            success_rate = ((total_requests - failed_requests) / total_requests) * 100
+        else:
+            success_rate = 0.0
+            
+        return {
+            'total_requests': total_requests,
+            'failed_requests': failed_requests,
+            'success_rate': f"{success_rate:.1f}%",
+            'response_times': all_response_times
+        }
+
     def _validate_response_length(self, response: str, strict: bool = True) -> str:
         """
         Validate that response is appropriately short for IRC
