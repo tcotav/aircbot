@@ -64,7 +64,7 @@ class Database:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute('''
                     INSERT INTO links (url, title, description, user, channel, timestamp)
-                    VALUES (?, ?, ?, ?, ?, datetime('now', 'subsec'))
+                    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 ''', (url, title or '', description or '', user, channel))
                 conn.commit()
                 return True
