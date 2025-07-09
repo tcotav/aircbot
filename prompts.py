@@ -4,6 +4,7 @@ Prompts and system messages for the IRC bot
 """
 
 from typing import Optional
+import logging
 
 
 class PromptTemplates:
@@ -33,7 +34,6 @@ class PromptTemplates:
                 
             except Exception as e:
                 # Log error but fall back to default prompt
-                import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"Error reading personality prompt file: {e}")
                 # Fall back to default prompt
