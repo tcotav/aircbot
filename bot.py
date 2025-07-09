@@ -360,7 +360,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         """Show recent links in the channel"""
         source_channel = self._get_source_channel(channel, requesting_user)
         is_private_context = self._is_private_context(channel, requesting_user)
-        links = self.db.get_recent_links(source_channel, limit=5)
+        links = self.db.get_recent_links(source_channel, limit=self.config.LINKS_RECENT_LIMIT)
         
         if not links:
             msg = "No links saved yet!"
@@ -383,7 +383,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         """Search for links matching a query"""
         source_channel = self._get_source_channel(channel, requesting_user)
         is_private_context = self._is_private_context(channel, requesting_user)
-        links = self.db.search_links(source_channel, query, limit=3)
+        links = self.db.search_links(source_channel, query, limit=self.config.LINKS_SEARCH_LIMIT)
         
         if not links:
             msg = f"No links found matching '{query}'"
@@ -562,7 +562,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         """Show recent links with detailed information (user, timestamp)"""
         source_channel = self._get_source_channel(channel, requesting_user)
         is_private_context = self._is_private_context(channel, requesting_user)
-        links = self.db.get_links_with_details(source_channel, limit=5)
+        links = self.db.get_links_with_details(source_channel, limit=self.config.LINKS_DETAILS_LIMIT)
         
         if not links:
             msg = "No links saved yet!"
@@ -606,7 +606,7 @@ class AircBot(irc.bot.SingleServerIRCBot):
         if is_private_context:
             intro_msg = f"🔍 Links shared by {username} in {source_channel}:"
         connection.privmsg(channel, intro_msg)
-        for link in links[:3]:  # Limit to 3 to avoid spam
+        for link in links[:self.config.LINKS_BY_USER_LIMIT]:  # Limit to avoid spam
             msg = f"• {link['title']} | 🕐 {link['formatted_time']} | 🔗 {link['url']}"
             if len(msg) > 400:
                 connection.privmsg(channel, f"• {link['title']}")
@@ -614,8 +614,8 @@ class AircBot(irc.bot.SingleServerIRCBot):
             else:
                 connection.privmsg(channel, msg)
         
-        if len(links) > 3:
-            connection.privmsg(channel, f"... and {len(links) - 3} more links")
+        if len(links) > self.config.LINKS_BY_USER_LIMIT:
+            connection.privmsg(channel, f"... and {len(links) - self.config.LINKS_BY_USER_LIMIT} more links")
     
     def handle_ask_command(self, connection, channel, user, question, show_thinking=True):
         """Handle !ask command - query the LLM with optional context"""

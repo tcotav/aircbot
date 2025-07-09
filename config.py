@@ -55,6 +55,12 @@ class Config:
     # Bot behavior
     COMMAND_PREFIX = '!'
     
+    # Link display limits
+    LINKS_RECENT_LIMIT = int(os.getenv('LINKS_RECENT_LIMIT', '5'))  # Default: 5 links for !links
+    LINKS_SEARCH_LIMIT = int(os.getenv('LINKS_SEARCH_LIMIT', '3'))  # Default: 3 links for !links search
+    LINKS_DETAILS_LIMIT = int(os.getenv('LINKS_DETAILS_LIMIT', '5'))  # Default: 5 links for !links details
+    LINKS_BY_USER_LIMIT = int(os.getenv('LINKS_BY_USER_LIMIT', '3'))  # Default: 3 links for !links by user
+    
     # Private messaging settings
     PRIVATE_MSG_ENABLED = os.getenv('PRIVATE_MSG_ENABLED', 'true').lower() == 'true'
     LINKS_USE_PRIVATE_MSG = os.getenv('LINKS_USE_PRIVATE_MSG', 'true').lower() == 'true'

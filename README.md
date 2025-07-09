@@ -212,6 +212,12 @@ See `personality_prompt.txt.example` for a sample personality configuration.
 - `RATE_LIMIT_USER_PER_MINUTE` - Max requests per user per minute (default: 1)
 - `RATE_LIMIT_TOTAL_PER_MINUTE` - Max total requests per minute (default: 10)
 
+### Link Display Limits
+- `LINKS_RECENT_LIMIT` - Number of links shown by `!links` command (default: 5)
+- `LINKS_SEARCH_LIMIT` - Number of links shown by `!links search` command (default: 3)
+- `LINKS_DETAILS_LIMIT` - Number of links shown by `!links details` command (default: 5)
+- `LINKS_BY_USER_LIMIT` - Number of links shown by `!links by <user>` command (default: 3)
+
 ### Privacy Protection
 - `PRIVACY_FILTER_ENABLED` - Enable privacy filtering for LLM context (default: true)
 - `PRIVACY_CHANNEL_SIZE_THRESHOLD` - Max channel size for full privacy filtering (default: 50)
