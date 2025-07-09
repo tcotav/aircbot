@@ -133,7 +133,7 @@ class SimpleDiscordBot(discord.Client):
         
         if not args:
             # Show recent links
-            links = self.db.get_recent_links(channel_name, limit=5)
+            links = self.db.get_recent_links(channel_name, limit=self.config.LINKS_RECENT_LIMIT)
             if not links:
                 await message.channel.send("No links saved yet!")
                 return
@@ -149,7 +149,7 @@ class SimpleDiscordBot(discord.Client):
         
         elif args[0] == "search" and len(args) > 1:
             query = ' '.join(args[1:])
-            links = self.db.search_links(channel_name, query, limit=3)
+            links = self.db.search_links(channel_name, query, limit=self.config.LINKS_SEARCH_LIMIT)
             if not links:
                 await message.channel.send(f"No links found matching '{query}'")
                 return
