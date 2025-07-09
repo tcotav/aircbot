@@ -93,6 +93,33 @@ class Config:
     PRIVACY_PII_DETECTION = os.getenv('PRIVACY_PII_DETECTION', 'true').lower() == 'true'
     PRIVACY_PRESERVE_CONVERSATION_FLOW = os.getenv('PRIVACY_PRESERVE_CONVERSATION_FLOW', 'true').lower() == 'true'
 
+    # Personality Prompt Settings
+    # Enable custom personality prompts for the bot
+    PERSONALITY_ENABLED = os.getenv('PERSONALITY_ENABLED', 'false').lower() == 'true'
+    # Path to personality prompt file
+    PERSONALITY_PROMPT_FILE = os.getenv('PERSONALITY_PROMPT_FILE', 'personality_prompt.txt')
+    
+    # Validate personality configuration
+    if PERSONALITY_ENABLED:
+        if not os.path.exists(PERSONALITY_PROMPT_FILE):
+            raise ValueError(
+                f"Personality prompt misconfiguration: PERSONALITY_ENABLED=true but "
+                f"PERSONALITY_PROMPT_FILE ('{PERSONALITY_PROMPT_FILE}') does not exist. "
+                f"Please either:\n"
+                f"1. Create the file '{PERSONALITY_PROMPT_FILE}' with your personality prompt, or\n"
+                f"2. Set PERSONALITY_ENABLED=false to disable personality prompts"
+            )
+        
+        # Check if file is empty
+        with open(PERSONALITY_PROMPT_FILE, 'r', encoding='utf-8') as f:
+            content = f.read().strip()
+            if not content:
+                raise ValueError(
+                    f"Personality prompt misconfiguration: PERSONALITY_ENABLED=true but "
+                    f"PERSONALITY_PROMPT_FILE ('{PERSONALITY_PROMPT_FILE}') is empty. "
+                    f"Please add your personality prompt to the file or set PERSONALITY_ENABLED=false"
+                )
+
     # Admin Settings
     # Comma-separated list of admin usernames who can use admin commands
     ADMIN_USERS = [user.strip() for user in os.getenv('ADMIN_USERS', '').split(',') if user.strip()]

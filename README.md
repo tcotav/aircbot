@@ -180,6 +180,31 @@ In fallback mode, the bot will:
 2. If local AI fails or gives a poor response (e.g., "I don't know"), automatically fall back to OpenAI
 3. Provides detailed logging so you can see which service handled each request
 
+### Personality Prompts (Optional)
+
+You can customize the bot's personality and response style by configuring a personality prompt:
+
+- `PERSONALITY_ENABLED` - Enable custom personality prompts (default: false)
+- `PERSONALITY_PROMPT_FILE` - Path to personality prompt file (default: personality_prompt.txt)
+
+**Example Usage:**
+```bash
+# Enable personality prompts
+export PERSONALITY_ENABLED=true
+export PERSONALITY_PROMPT_FILE=personality_prompt.txt
+
+# Create personality file
+echo "Respond in an impersonal and snarky manner to these questions. Don't worry about hurting the asker's feelings." > personality_prompt.txt
+```
+
+**Important Notes:**
+- If `PERSONALITY_ENABLED=true`, the specified file **must exist** and contain content
+- The personality prompt replaces the default friendly behavior
+- The bot will still identify as its configured nickname
+- Personality prompts work with all LLM modes (local, OpenAI, fallback)
+
+See `personality_prompt.txt.example` for a sample personality configuration.
+
 ### Database
 - `DATABASE_PATH` - Path to SQLite database file
 

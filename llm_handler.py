@@ -323,7 +323,7 @@ class LLMHandler:
             # Build the prompt
             messages = []
             
-            system_content = get_system_prompt(self.config.IRC_NICKNAME, context)
+            system_content = get_system_prompt(self.config.IRC_NICKNAME, context, self.config)
             messages.append({
                 "role": "system",
                 "content": system_content
