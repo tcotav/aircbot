@@ -111,7 +111,7 @@ class Config:
             )
         
         # Check if file is empty
-        with open(PERSONALITY_PROMPT_FILE, 'r') as f:
+        with open(PERSONALITY_PROMPT_FILE, 'r', encoding='utf-8') as f:
             content = f.read().strip()
             if not content:
                 raise ValueError(
