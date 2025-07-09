@@ -25,7 +25,7 @@ class PromptTemplates:
         # Check if personality prompt is enabled and available
         if config and config.PERSONALITY_ENABLED:
             try:
-                with open(config.PERSONALITY_PROMPT_FILE, 'r') as f:
+                with open(config.PERSONALITY_PROMPT_FILE, 'r', encoding='utf-8') as f:
                     personality_prompt = f.read().strip()
                     
                 # Use personality prompt as the base, but still include bot name
