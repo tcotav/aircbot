@@ -10,27 +10,55 @@ class PromptTemplates:
     """Collection of prompt templates for the LLM"""
     
     @staticmethod
-    def get_system_prompt(bot_name: str, context: Optional[str] = None) -> str:
+    def get_system_prompt(bot_name: str, context: Optional[str] = None, config=None) -> str:
         """
         Get the system prompt for the LLM
         
         Args:
             bot_name: The name of the bot
             context: Optional recent channel context
+            config: Config object for personality settings
             
         Returns:
             Formatted system prompt
         """
-        base_prompt = (
-            f"You are {bot_name}, a friendly IRC bot. "
-            "Give direct, concise answers without any thinking process or reasoning. "
-            "Do not use <think> tags or explain your thought process. "
-            "Answer immediately and briefly. "
-            "Example: User says 'hello' -> You say 'Hi there!' "
-            "User says 'how are you?' -> You say 'I'm great, thanks!' "
-            "User says 'name three mountain ranges' -> You say 'The Rocky Mountains, Sierra Nevada, and Cascade Range.' "
-            "Keep responses 1-3 sentences max. No thinking, just direct answers."
-        )
+        # Check if personality prompt is enabled and available
+        if config and config.PERSONALITY_ENABLED:
+            try:
+                with open(config.PERSONALITY_PROMPT_FILE, 'r') as f:
+                    personality_prompt = f.read().strip()
+                    
+                # Use personality prompt as the base, but still include bot name
+                base_prompt = f"You are {bot_name}. {personality_prompt}"
+                
+            except Exception as e:
+                # Log error but fall back to default prompt
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error reading personality prompt file: {e}")
+                # Fall back to default prompt
+                base_prompt = (
+                    f"You are {bot_name}, a friendly IRC bot. "
+                    "Give direct, concise answers without any thinking process or reasoning. "
+                    "Do not use <think> tags or explain your thought process. "
+                    "Answer immediately and briefly. "
+                    "Example: User says 'hello' -> You say 'Hi there!' "
+                    "User says 'how are you?' -> You say 'I'm great, thanks!' "
+                    "User says 'name three mountain ranges' -> You say 'The Rocky Mountains, Sierra Nevada, and Cascade Range.' "
+                    "Keep responses 1-3 sentences max. No thinking, just direct answers."
+                )
+        else:
+            # Default prompt when personality is disabled
+            base_prompt = (
+                f"You are {bot_name}, a friendly IRC bot. "
+                "Give direct, concise answers without any thinking process or reasoning. "
+                "Do not use <think> tags or explain your thought process. "
+                "Answer immediately and briefly. "
+                "Example: User says 'hello' -> You say 'Hi there!' "
+                "User says 'how are you?' -> You say 'I'm great, thanks!' "
+                "User says 'name three mountain ranges' -> You say 'The Rocky Mountains, Sierra Nevada, and Cascade Range.' "
+                "Keep responses 1-3 sentences max. No thinking, just direct answers."
+            )
         
         if context:
             return f"{base_prompt}\n\nRecent context:\n{context}"
@@ -107,9 +135,9 @@ class PromptTemplates:
 
 
 # Convenience functions for backward compatibility
-def get_system_prompt(bot_name: str, context: Optional[str] = None) -> str:
+def get_system_prompt(bot_name: str, context: Optional[str] = None, config=None) -> str:
     """Get system prompt (convenience function)"""
-    return PromptTemplates.get_system_prompt(bot_name, context)
+    return PromptTemplates.get_system_prompt(bot_name, context, config)
 
 
 def get_thinking_message(user: str, question: str) -> str:
