@@ -1,0 +1,212 @@
+# Claude Development Commands & Workflows
+
+This file documents common commands and workflows used for developing the AircBot project with Claude Code.
+
+## Virtual Environment Setup
+
+```bash
+# Activate the virtual environment (from project root)
+source venv/bin/activate
+```
+
+## Testing Commands
+
+```bash
+# Run tests with virtual environment
+source venv/bin/activate && python test_filename.py
+
+# Run Python scripts
+python3 script_name.py
+
+# Run with activated venv
+source venv/bin/activate && python script_name.py
+```
+
+## File Management
+
+```bash
+# Remove test files
+rm test_filename.py
+
+# Check if files exist
+ls -la filename.txt
+
+# Create example files
+echo "content here" > filename.txt.example
+```
+
+## Development Workflow - Adding New Features
+
+### 1. Analysis Phase
+- Use `Read` tool to examine existing code structure
+- Use `Glob` to find relevant files by pattern
+- Use `Grep` to search for specific code patterns
+- Use `Task` tool for complex searches across codebase
+
+### 2. Implementation Phase
+- Use `TodoWrite` to track implementation tasks
+- Use `Edit` tool to modify existing files
+- Use `Write` tool to create new files
+- Use `MultiEdit` for multiple changes to same file
+
+### 3. Testing Phase
+- Create test scripts to verify functionality
+- Run tests with virtual environment
+- Clean up test files after verification
+
+## Code Search Patterns
+
+```bash
+# Find files with specific patterns
+*.py              # All Python files
+*config*          # Files with 'config' in name
+*.json            # JSON configuration files
+*.yml, *.yaml     # YAML files
+
+# Search for code patterns
+llm_handler|LLMHandler    # Find LLM handler usage
+get_system_prompt         # Find system prompt usage
+```
+
+## Project Structure Understanding
+
+### Key Files for Bot Development
+- `bot.py` - Main bot logic and IRC handling
+- `config.py` - Configuration management
+- `llm_handler.py` - LLM integration and API calls
+- `prompts.py` - Prompt templates and system messages
+- `database.py` - Database operations
+- `content_filter.py` - Content filtering
+- `context_manager.py` - Message context handling
+
+### Configuration Pattern
+1. Add new config variables to `config.py`
+2. Add validation logic if needed
+3. Update relevant handlers to use new config
+4. Test with example configurations
+
+## Feature Development Example - Personality Prompts
+
+### Files Modified:
+- `config.py` - Added personality configuration and validation
+- `prompts.py` - Updated system prompt generation
+- `llm_handler.py` - Updated to pass config to prompt functions
+
+### Configuration Added:
+```python
+# In config.py
+PERSONALITY_ENABLED = os.getenv('PERSONALITY_ENABLED', 'false').lower() == 'true'
+PERSONALITY_PROMPT_FILE = os.getenv('PERSONALITY_PROMPT_FILE', 'personality_prompt.txt')
+```
+
+### Usage:
+```bash
+# Enable personality
+export PERSONALITY_ENABLED=true
+export PERSONALITY_PROMPT_FILE=personality_prompt.txt
+
+# Create personality file
+echo "Your personality prompt here" > personality_prompt.txt
+```
+
+## Common Git Commands
+
+```bash
+# Check status
+git status
+
+# Add files
+git add filename.py
+
+# Commit changes
+git commit -m "Add personality prompt feature
+
+🤖 Generated with Claude Code
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# Check recent commits
+git log --oneline -n 5
+```
+
+## Debugging & Troubleshooting
+
+### Module Import Issues
+- Always activate virtual environment first
+- Check if required packages are installed
+- Verify Python path includes project directory
+
+### Configuration Issues
+- Check environment variables are set
+- Verify file paths are correct
+- Look for validation errors in config.py
+
+### Testing Issues
+- Run tests from project root directory
+- Ensure virtual environment is activated
+- Clean up test files after use
+
+## Best Practices
+
+1. **Always use TodoWrite** to track complex tasks
+2. **Test incrementally** - create small test scripts for new features
+3. **Follow existing patterns** - examine similar functionality first
+4. **Clean up** - remove test files and temporary code
+5. **Document** - update this file with new workflows
+6. **Error handling** - add proper validation for new config options
+
+## Environment Variables Reference
+
+```bash
+# Core bot settings
+export IRC_SERVER=irc.libera.chat
+export IRC_NICKNAME=aircbot
+export IRC_CHANNEL=#yourchannel
+
+# LLM settings
+export LLM_ENABLED=true
+export LLM_MODE=local_only  # or openai_only, fallback
+
+# Personality settings
+export PERSONALITY_ENABLED=true
+export PERSONALITY_PROMPT_FILE=personality_prompt.txt
+
+# Rate limiting
+export RATE_LIMIT_USER_PER_MINUTE=1
+export RATE_LIMIT_TOTAL_PER_MINUTE=10
+```
+
+## File Templates
+
+### Test Script Template
+```python
+#!/usr/bin/env python3
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from config import Config
+from module_to_test import function_to_test
+
+def test_feature():
+    """Test description"""
+    # Test implementation
+    assert condition
+    print("✓ Test passed")
+
+if __name__ == "__main__":
+    test_feature()
+    print("✅ All tests passed!")
+```
+
+### Configuration Addition Template
+```python
+# In config.py
+FEATURE_ENABLED = os.getenv('FEATURE_ENABLED', 'false').lower() == 'true'
+FEATURE_SETTING = os.getenv('FEATURE_SETTING', 'default_value')
+
+# Add validation if needed
+if FEATURE_ENABLED:
+    # Validation logic here
+    pass
+```
