@@ -101,8 +101,7 @@ class Config:
     
     # Validate personality configuration
     if PERSONALITY_ENABLED:
-        import os as _os
-        if not _os.path.exists(PERSONALITY_PROMPT_FILE):
+        if not os.path.exists(PERSONALITY_PROMPT_FILE):
             raise ValueError(
                 f"Personality prompt misconfiguration: PERSONALITY_ENABLED=true but "
                 f"PERSONALITY_PROMPT_FILE ('{PERSONALITY_PROMPT_FILE}') does not exist. "
