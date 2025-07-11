@@ -44,7 +44,7 @@ An intelligent IRC/Discord bot that automatically saves shared links and provide
 3. **Test the bot (optional):**
    ```bash
    ./run_tests.sh                # Run complete consolidated test suite (recommended)
-   python -m pytest test_consolidated.py -v  # Run tests with verbose output
+   python -m pytest tests/test_consolidated.py -v  # Run tests with verbose output
    python demo.py                # Run interactive demo of privacy & admin features
    ```
 
@@ -96,7 +96,7 @@ AircBot includes an advanced privacy filter to protect user information when sen
 - **Optimizes for channel size** with configurable performance thresholds
 - **Maintains conversation context** so LLMs can still provide relevant responses
 
-The privacy filter is enabled by default and works transparently. For complete documentation, configuration options, and examples, see the **[Privacy Filter Guide](PRIVACY_FILTER_GUIDE.md)**.
+The privacy filter is enabled by default and works transparently. For complete documentation, configuration options, and examples, see the **[Privacy Filter Guide](docs/PRIVACY_FILTER_GUIDE.md)**.
 
 ## Configuration
 
