@@ -8,9 +8,10 @@ The fallback system analyzes local LLM responses using multiple criteria:
 
 1. **Response Length** - Detects very short or incomplete responses
 2. **"I Don't Know" Patterns** - Identifies when the local LLM admits uncertainty
-3. **Relevance Scoring** - Checks if responses match the question topic
+3. **Relevance Scoring** - Checks if responses match the question topic (keyword-based)
 4. **Semantic Coherence** - Detects repetitive or broken responses
 5. **Response Type Matching** - Ensures responses match question types (code, explanations, etc.)
+6. **Semantic Similarity** - Uses AI-powered embeddings to understand response relevance beyond keywords (optional)
 
 ## Configuration Variables
 
@@ -134,6 +135,83 @@ export FALLBACK_RELEVANCE_MIN_RATIO=0.2
 - **Higher values (20):** Accept longer responses without code format
 - **Recommended:** 5-15 for most environments
 
+### Semantic Similarity Configuration (Optional)
+
+The bot supports advanced semantic similarity scoring using AI-powered sentence embeddings. This feature provides more intelligent fallback decisions beyond simple keyword matching.
+
+**Requirements:** `pip install sentence-transformers`
+
+#### `SEMANTIC_SIMILARITY_ENABLED` (default: `false`)
+**What it does:** Enables semantic similarity scoring for fallback decisions.
+**Effect of changing:**
+- **`true`:** Activates AI-powered relevance scoring (requires sentence-transformers)
+- **`false`:** Uses only traditional keyword-based scoring (default for performance)
+- **Recommended:** `true` for technical discussions, `false` for casual chat or resource-constrained environments
+
+#### `SEMANTIC_SIMILARITY_MIN_THRESHOLD` (default: `0.3`)
+**What it does:** Minimum similarity score (0.0-1.0) required between question and response.
+**Effect of changing:**
+- **Lower values (0.1-0.2):** More permissive, accepts responses with lower semantic similarity
+- **Higher values (0.4-0.6):** More strict, requires higher semantic similarity
+- **Recommended:** 0.3-0.4 for balanced operation, 0.4-0.5 for technical accuracy
+
+#### `SEMANTIC_SIMILARITY_WEIGHT` (default: `0.4`)
+**What it does:** Weight of semantic similarity in combined scoring (0.0-1.0).
+**Effect of changing:**
+- **Lower values (0.2-0.3):** Less influence of semantic scoring
+- **Higher values (0.5-0.7):** More influence of semantic scoring
+- **Recommended:** 0.4-0.5 for balanced operation
+
+#### `SEMANTIC_MODEL_NAME` (default: `all-MiniLM-L6-v2`)
+**What it does:** Specifies which sentence transformer model to use.
+**Effect of changing:**
+- **`all-MiniLM-L6-v2`:** Lightweight (22MB), fast, good for general use
+- **`all-mpnet-base-v2`:** Larger (420MB), more accurate, better for technical content
+- **`all-distilroberta-v1`:** Medium (290MB), good balance of speed and accuracy
+- **Recommended:** Keep default unless you have specific accuracy requirements
+
+#### `SEMANTIC_MODEL_DEVICE` (default: `cpu`)
+**What it does:** Specifies processing device for the semantic model.
+**Effect of changing:**
+- **`cpu`:** Uses CPU processing (slower but widely compatible)
+- **`cuda`:** Uses GPU processing (faster but requires CUDA-compatible GPU)
+- **Recommended:** `cpu` for most setups, `cuda` if you have a compatible GPU
+
+#### `SEMANTIC_CACHE_SIZE` (default: `100`)
+**What it does:** Number of embeddings to cache for performance.
+**Effect of changing:**
+- **Lower values (25-50):** Less memory usage, more recomputation
+- **Higher values (200-500):** More memory usage, better performance
+- **Recommended:** 100-200 for most environments
+
+#### `SEMANTIC_CONTEXT_ENABLED` (default: `true`)
+**What it does:** Whether to consider conversation context in semantic scoring.
+**Effect of changing:**
+- **`true`:** Uses conversation history for better relevance (recommended)
+- **`false`:** Only considers question-response similarity
+- **Recommended:** `true` for most environments
+
+#### `SEMANTIC_CONTEXT_WEIGHT` (default: `0.2`)
+**What it does:** Weight of context similarity in combined scoring (0.0-1.0).
+**Effect of changing:**
+- **Lower values (0.1):** Less influence of conversation context
+- **Higher values (0.3-0.4):** More influence of conversation context
+- **Recommended:** 0.2-0.3 for most environments
+
+#### `SEMANTIC_ENTITY_BOOST` (default: `1.2`)
+**What it does:** Boost factor for responses that address technical keywords.
+**Effect of changing:**
+- **Lower values (1.0-1.1):** Less boost for technical accuracy
+- **Higher values (1.3-1.5):** More boost for technical accuracy
+- **Recommended:** 1.2-1.3 for technical discussions
+
+#### `SEMANTIC_TECHNICAL_KEYWORDS` (default: extensive list)
+**What it does:** Comma-separated list of technical keywords that receive boost scoring.
+**Effect of changing:**
+- **Add domain-specific terms:** Better scoring for your specific technical domain
+- **Remove irrelevant terms:** Cleaner scoring for non-technical environments
+- **Recommended:** Customize for your specific use case
+
 ## Common Configuration Scenarios
 
 ### Scenario 1: Permissive IRC Environment
@@ -145,6 +223,8 @@ export FALLBACK_RELEVANCE_MIN_RATIO=0.03
 export FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS=10
 export FALLBACK_GENERIC_RESPONSE_MAX_WORDS=20
 export FALLBACK_EXPLANATION_MIN_WORDS=5
+# Disable semantic similarity for performance
+export SEMANTIC_SIMILARITY_ENABLED=false
 ```
 
 ### Scenario 2: Technical Support Environment
@@ -157,6 +237,10 @@ export FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS=20
 export FALLBACK_GENERIC_RESPONSE_MAX_WORDS=30
 export FALLBACK_EXPLANATION_MIN_WORDS=12
 export FALLBACK_CODE_SHORT_ANSWER_MAX_WORDS=15
+# Enable semantic similarity for technical accuracy
+export SEMANTIC_SIMILARITY_ENABLED=true
+export SEMANTIC_SIMILARITY_MIN_THRESHOLD=0.3
+export SEMANTIC_ENTITY_BOOST=1.3
 ```
 
 ### Scenario 3: Strict Educational Environment
@@ -169,6 +253,11 @@ export FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS=25
 export FALLBACK_GENERIC_RESPONSE_MAX_WORDS=35
 export FALLBACK_EXPLANATION_MIN_WORDS=15
 export FALLBACK_REPETITION_MAX_WORD_RATIO=0.25
+# Strict semantic similarity for educational accuracy
+export SEMANTIC_SIMILARITY_ENABLED=true
+export SEMANTIC_SIMILARITY_MIN_THRESHOLD=0.4
+export SEMANTIC_SIMILARITY_WEIGHT=0.5
+export SEMANTIC_ENTITY_BOOST=1.2
 ```
 
 ### Scenario 4: Development/Testing Environment
@@ -181,6 +270,23 @@ export FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS=30
 export FALLBACK_GENERIC_RESPONSE_MAX_WORDS=40
 export FALLBACK_EXPLANATION_MIN_WORDS=20
 export FALLBACK_REPETITION_MAX_WORD_RATIO=0.2
+# Enable semantic similarity for testing
+export SEMANTIC_SIMILARITY_ENABLED=true
+export SEMANTIC_SIMILARITY_MIN_THRESHOLD=0.5
+export SEMANTIC_CACHE_SIZE=50
+```
+
+### Scenario 5: Resource-Constrained Environment
+For environments with limited CPU/memory resources:
+
+```bash
+export FALLBACK_MIN_RESPONSE_LENGTH=3
+export FALLBACK_RELEVANCE_MIN_RATIO=0.05
+export FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS=15
+export FALLBACK_GENERIC_RESPONSE_MAX_WORDS=25
+export FALLBACK_EXPLANATION_MIN_WORDS=8
+# Disable semantic similarity to save resources
+export SEMANTIC_SIMILARITY_ENABLED=false
 ```
 
 ## Testing Your Configuration
@@ -193,6 +299,28 @@ python tests/test_fallback_logic.py
 
 # Run with your custom configuration
 FALLBACK_MIN_RESPONSE_LENGTH=5 python tests/test_fallback_logic.py
+
+# Test semantic similarity functionality
+python tests/test_semantic_similarity.py
+
+# Test with semantic similarity enabled
+SEMANTIC_SIMILARITY_ENABLED=true python tests/test_semantic_similarity.py
+```
+
+### Semantic Similarity Testing
+
+The semantic similarity feature requires additional testing considerations:
+
+```bash
+# Test basic functionality (works without sentence-transformers)
+python tests/test_semantic_similarity.py
+
+# Test with sentence-transformers installed
+pip install sentence-transformers
+SEMANTIC_SIMILARITY_ENABLED=true python tests/test_semantic_similarity.py
+
+# Test different models
+SEMANTIC_MODEL_NAME=all-mpnet-base-v2 python tests/test_semantic_similarity.py
 ```
 
 ## Monitoring and Tuning

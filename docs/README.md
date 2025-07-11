@@ -5,7 +5,8 @@ This directory contains comprehensive documentation for all AircBot features and
 ## Core Documentation
 
 ### Configuration & Setup
-- **[FALLBACK_CONFIGURATION.md](FALLBACK_CONFIGURATION.md)** - Complete guide to LLM fallback logic configuration
+- **[CONFIGURATION.md](CONFIGURATION.md)** - Complete configuration guide for all bot settings
+- **[FALLBACK_CONFIGURATION.md](FALLBACK_CONFIGURATION.md)** - Advanced LLM fallback logic and semantic similarity configuration
 - **[OPENAI_INTEGRATION.md](OPENAI_INTEGRATION.md)** - OpenAI API integration documentation
 - **[PRIVACY_FILTER_GUIDE.md](PRIVACY_FILTER_GUIDE.md)** - Privacy protection and user anonymization guide
 
@@ -21,9 +22,10 @@ This directory contains comprehensive documentation for all AircBot features and
 ## Quick Navigation
 
 ### For New Users
-1. Start with [PRIVACY_FILTER_GUIDE.md](PRIVACY_FILTER_GUIDE.md) to understand privacy protection
-2. Configure LLM fallback using [FALLBACK_CONFIGURATION.md](FALLBACK_CONFIGURATION.md)
-3. Set up OpenAI integration with [OPENAI_INTEGRATION.md](OPENAI_INTEGRATION.md)
+1. Start with [CONFIGURATION.md](CONFIGURATION.md) for basic bot setup
+2. Review [PRIVACY_FILTER_GUIDE.md](PRIVACY_FILTER_GUIDE.md) to understand privacy protection
+3. Configure advanced fallback logic using [FALLBACK_CONFIGURATION.md](FALLBACK_CONFIGURATION.md)
+4. Set up OpenAI integration with [OPENAI_INTEGRATION.md](OPENAI_INTEGRATION.md)
 
 ### For Developers
 1. Review [CONTEXT_IMPLEMENTATION.md](CONTEXT_IMPLEMENTATION.md) for conversation management
