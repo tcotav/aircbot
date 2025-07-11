@@ -20,6 +20,12 @@ python3 script_name.py
 
 # Run with activated venv
 source venv/bin/activate && python script_name.py
+
+# Run fallback logic tests
+source venv/bin/activate && python tests/test_fallback_logic.py
+
+# Run tests with custom fallback configuration
+FALLBACK_MIN_RESPONSE_LENGTH=5 source venv/bin/activate && python tests/test_fallback_logic.py
 ```
 
 ## File Management
@@ -154,6 +160,57 @@ git log --oneline -n 5
 4. **Clean up** - remove test files and temporary code
 5. **Document** - update this file with new workflows
 6. **Error handling** - add proper validation for new config options
+7. **Fallback configuration** - use test suite to validate settings before deployment
+8. **Monitor fallback rates** - aim for 10-20% fallback rate in normal operation
+
+## LLM Fallback Configuration
+
+The bot includes enhanced fallback logic that determines when to switch from local LLM to OpenAI based on response quality. This is only active when `LLM_MODE=fallback`.
+
+### Key Configuration Settings
+
+```bash
+# Basic response filtering
+export FALLBACK_MIN_RESPONSE_LENGTH=3              # Min chars for valid response
+export FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS=15     # Context check for uncertain responses
+
+# Relevance scoring
+export FALLBACK_RELEVANCE_MIN_RATIO=0.05           # Min keyword overlap ratio
+export FALLBACK_RELEVANCE_MIN_QUESTION_WORDS=3     # Min question words for relevance check
+
+# Response quality thresholds
+export FALLBACK_GENERIC_RESPONSE_MAX_WORDS=25      # Max words for generic responses
+export FALLBACK_EXPLANATION_MIN_WORDS=8            # Min words for explanations
+export FALLBACK_REPETITION_MAX_WORD_RATIO=0.3      # Max word repetition ratio
+```
+
+### Common Configurations
+
+**Permissive (IRC/Casual):**
+```bash
+export FALLBACK_MIN_RESPONSE_LENGTH=2
+export FALLBACK_RELEVANCE_MIN_RATIO=0.03
+export FALLBACK_EXPLANATION_MIN_WORDS=5
+```
+
+**Strict (Technical/Educational):**
+```bash
+export FALLBACK_MIN_RESPONSE_LENGTH=5
+export FALLBACK_RELEVANCE_MIN_RATIO=0.15
+export FALLBACK_EXPLANATION_MIN_WORDS=15
+```
+
+### Testing Fallback Configuration
+
+```bash
+# Run fallback tests with default settings
+source venv/bin/activate && python tests/test_fallback_logic.py
+
+# Test with custom configuration
+FALLBACK_MIN_RESPONSE_LENGTH=5 FALLBACK_RELEVANCE_MIN_RATIO=0.1 source venv/bin/activate && python tests/test_fallback_logic.py
+```
+
+See `docs/FALLBACK_CONFIGURATION.md` for detailed explanation of all settings.
 
 ## Environment Variables Reference
 

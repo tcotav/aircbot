@@ -105,6 +105,39 @@ class Config:
     # Path to personality prompt file
     PERSONALITY_PROMPT_FILE = os.getenv('PERSONALITY_PROMPT_FILE', 'personality_prompt.txt')
     
+    # LLM Fallback Configuration
+    # These settings control when the bot falls back from local LLM to OpenAI
+    
+    # Minimum response length before considering fallback (characters)
+    FALLBACK_MIN_RESPONSE_LENGTH = int(os.getenv('FALLBACK_MIN_RESPONSE_LENGTH', '3'))
+    
+    # Minimum response length for "I don't know" context check (words)
+    FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS = int(os.getenv('FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS', '15'))
+    
+    # Relevance scoring thresholds
+    FALLBACK_RELEVANCE_MIN_RATIO = float(os.getenv('FALLBACK_RELEVANCE_MIN_RATIO', '0.05'))
+    FALLBACK_RELEVANCE_MIN_QUESTION_WORDS = int(os.getenv('FALLBACK_RELEVANCE_MIN_QUESTION_WORDS', '3'))
+    
+    # Question type mismatch thresholds
+    FALLBACK_TYPE_MISMATCH_MIN_RATIO = float(os.getenv('FALLBACK_TYPE_MISMATCH_MIN_RATIO', '0.1'))
+    FALLBACK_TYPE_MISMATCH_MIN_QUESTION_WORDS = int(os.getenv('FALLBACK_TYPE_MISMATCH_MIN_QUESTION_WORDS', '5'))
+    
+    # Generic response detection threshold (words)
+    FALLBACK_GENERIC_RESPONSE_MAX_WORDS = int(os.getenv('FALLBACK_GENERIC_RESPONSE_MAX_WORDS', '25'))
+    
+    # Repetition detection thresholds
+    FALLBACK_REPETITION_MAX_WORD_RATIO = float(os.getenv('FALLBACK_REPETITION_MAX_WORD_RATIO', '0.3'))
+    FALLBACK_REPETITION_MIN_WORD_LENGTH = int(os.getenv('FALLBACK_REPETITION_MIN_WORD_LENGTH', '3'))
+    
+    # Explanation response minimum word count
+    FALLBACK_EXPLANATION_MIN_WORDS = int(os.getenv('FALLBACK_EXPLANATION_MIN_WORDS', '8'))
+    
+    # Procedural response minimum word count for short answer bypass
+    FALLBACK_PROCEDURAL_SHORT_ANSWER_MAX_WORDS = int(os.getenv('FALLBACK_PROCEDURAL_SHORT_ANSWER_MAX_WORDS', '15'))
+    
+    # Code response minimum word count for short answer bypass
+    FALLBACK_CODE_SHORT_ANSWER_MAX_WORDS = int(os.getenv('FALLBACK_CODE_SHORT_ANSWER_MAX_WORDS', '10'))
+    
     # Validate personality configuration
     if PERSONALITY_ENABLED:
         if not os.path.exists(PERSONALITY_PROMPT_FILE):

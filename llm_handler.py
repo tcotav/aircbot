@@ -223,7 +223,7 @@ class LLMHandler:
             local_result = self._ask_local(question, context)
             
             # Check if local response is good enough
-            if local_result and not self._is_fallback_response(local_result):
+            if local_result and not self._is_fallback_response(local_result, question):
                 logger.info("Local LLM provided satisfactory response")
                 return local_result
             else:
@@ -240,17 +240,22 @@ class LLMHandler:
         else:
             return get_error_message('llm_unavailable')
     
-    def _is_fallback_response(self, response: str) -> bool:
+    def _is_fallback_response(self, response: str, question: str = None) -> bool:
         """
         Determine if a response from local LLM warrants falling back to OpenAI
         
         Args:
             response: The response from local LLM
+            question: The original question (optional, for relevance scoring)
             
         Returns:
             True if we should fall back to OpenAI, False if response is adequate
         """
         if not response:
+            return True
+            
+        # If question is empty or whitespace, should fallback
+        if not question or not question.strip():
             return True
             
         # Check for error messages
@@ -264,10 +269,11 @@ class LLMHandler:
             return True
         
         # Check for very short or generic responses that might indicate the local model struggled
-        if len(response.strip()) < 10:
+        # Be more lenient for IRC-style short answers
+        if len(response.strip()) < self.config.FALLBACK_MIN_RESPONSE_LENGTH:
             return True
             
-        # Check for common "I don't know" patterns
+        # Check for common "I don't know" patterns (but be context-aware)
         dont_know_patterns = [
             "i don't know",
             "i'm not sure",
@@ -279,9 +285,241 @@ class LLMHandler:
         ]
         
         response_lower = response.lower()
+        # Only flag if response is short and starts with these patterns
         if any(pattern in response_lower for pattern in dont_know_patterns):
+            # If response continues with useful information, don't flag
+            if len(response.split()) > self.config.FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS:
+                return False
+            # Also check if it's at the beginning of the response
+            if not any(response_lower.startswith(pattern) for pattern in dont_know_patterns):
+                return False  # Pattern is not at the beginning, might be contextual
+            return True
+        
+        # Enhanced quality checks
+        if self._has_poor_semantic_coherence(response):
             return True
             
+        # Check relevance if question is provided and not empty
+        if question and question.strip() and not self._is_response_relevant(question, response):
+            return True
+            
+        return False
+
+    def _is_response_relevant(self, question: str, response: str) -> bool:
+        """
+        Check if the response is relevant to the question asked
+        
+        Args:
+            question: The original question
+            response: The LLM response
+            
+        Returns:
+            True if response is relevant, False otherwise
+        """
+        if not question or not response:
+            return False
+            
+        # Extract key terms from question and response
+        question_lower = question.lower()
+        response_lower = response.lower()
+        
+        # Remove common stop words for better keyword matching
+        stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'how', 'what', 'when', 'where', 'why', 'is', 'are', 'was', 'were', 'do', 'does', 'did', 'can', 'could', 'should', 'would', 'will'}
+        
+        # Extract meaningful words (3+ chars, not stop words, clean punctuation)
+        import re
+        question_words = [re.sub(r'[^\w]', '', word) for word in question_lower.split() if len(re.sub(r'[^\w]', '', word)) >= 3 and re.sub(r'[^\w]', '', word) not in stop_words]
+        
+        # Check for keyword overlap
+        keyword_matches = 0
+        for word in question_words:
+            if word in response_lower:
+                keyword_matches += 1
+        
+        # Calculate relevance ratio
+        if not question_words:
+            return True  # Can't determine relevance, assume it's fine
+            
+        relevance_ratio = keyword_matches / len(question_words)
+        
+        # If very few keywords match, likely irrelevant (but be very lenient)
+        if relevance_ratio < self.config.FALLBACK_RELEVANCE_MIN_RATIO and len(question_words) > self.config.FALLBACK_RELEVANCE_MIN_QUESTION_WORDS:
+            return False
+            
+        # Check for question type matching (only for obvious mismatches)
+        question_type = self._identify_question_type(question_lower)
+        if not self._response_matches_question_type(question_type, response_lower):
+            # Only fail if it's a severe mismatch AND very low keyword overlap AND long question
+            if relevance_ratio < self.config.FALLBACK_TYPE_MISMATCH_MIN_RATIO and len(question_words) > self.config.FALLBACK_TYPE_MISMATCH_MIN_QUESTION_WORDS:
+                return False
+            
+        # Check for generic/template responses (but only if response is actually generic)
+        if self._is_generic_response(response_lower) and len(response.split()) < self.config.FALLBACK_GENERIC_RESPONSE_MAX_WORDS:
+            return False
+            
+        return True
+    
+    def _identify_question_type(self, question: str) -> str:
+        """Identify the type of question being asked"""
+        if any(word in question for word in ['how', 'explain', 'describe', 'what is', 'what does']):
+            return 'explanation'
+        elif any(word in question for word in ['code', 'implement', 'write', 'create', 'build']):
+            return 'code'
+        elif any(word in question for word in ['list', 'steps', 'process', 'procedure']):
+            return 'procedural'
+        elif any(word in question for word in ['why', 'reason', 'because']):
+            return 'reasoning'
+        else:
+            return 'general'
+    
+    def _response_matches_question_type(self, question_type: str, response: str) -> bool:
+        """Check if response format matches question type - be very lenient"""
+        if question_type == 'code':
+            # Code questions should have some technical content - but be flexible
+            code_indicators = ['```', 'def ', 'function', 'class ', 'import ', 'return', '{', '}', '()', 'def(', 'print(', 'for ', 'while ', 'if ', 'loop', 'select', 'update', 'insert', 'delete', 'var ', 'let ', 'const ', '=', 'git ', 'npm ', 'pip ', 'docker', 'kubectl', 'mysql', 'postgres', 'redis', 'api', 'json', 'xml', 'http', 'https', 'tcp', 'udp', 'ssh', 'ftp']
+            return any(indicator in response for indicator in code_indicators) or len(response.split()) < self.config.FALLBACK_CODE_SHORT_ANSWER_MAX_WORDS
+        elif question_type == 'procedural':
+            # Procedural questions should have steps or lists - but be flexible
+            procedural_indicators = ['1.', '2.', 'first', 'second', 'then', 'next', 'step', 'process', 'install', 'configure', 'setup', 'run', 'execute', 'deploy', 'build', 'test', 'check', 'verify']
+            return any(indicator in response for indicator in procedural_indicators) or len(response.split()) < self.config.FALLBACK_PROCEDURAL_SHORT_ANSWER_MAX_WORDS
+        elif question_type == 'explanation':
+            # Explanations should be reasonably detailed - but not too strict
+            return len(response.split()) > self.config.FALLBACK_EXPLANATION_MIN_WORDS
+        else:
+            return True  # General questions are flexible
+    
+    def _is_generic_response(self, response: str) -> bool:
+        """Check if response is too generic/template-like"""
+        generic_patterns = [
+            "i'd be happy to help",
+            "here's some information",
+            "let me help you with that",
+            "that's a great question",
+            "i understand you're asking about",
+            "this is a common question"
+        ]
+        
+        # If response starts with generic patterns and doesn't provide specific info
+        response_start = response[:100].lower()
+        if any(pattern in response_start for pattern in generic_patterns):
+            # Check if it continues with specific information
+            if len(response.split()) < self.config.FALLBACK_GENERIC_RESPONSE_MAX_WORDS:
+                return True
+                
+        return False
+
+    def _has_poor_semantic_coherence(self, response: str) -> bool:
+        """
+        Check if response has poor semantic coherence
+        
+        Args:
+            response: The LLM response to analyze
+            
+        Returns:
+            True if response has poor coherence, False otherwise
+        """
+        if not response:
+            return True
+            
+        # Check for excessive repetition first (works on any response)
+        if self._has_excessive_repetition(response):
+            return True
+            
+        # Split into sentences (basic approach)
+        sentences = [s.strip() for s in response.replace('!', '.').replace('?', '.').split('.') if s.strip()]
+        
+        if len(sentences) < 2:
+            return False  # Can't check coherence with just one sentence
+            
+        # Check for incomplete sentences or broken structure
+        if self._has_broken_structure(sentences):
+            return True
+            
+        # Check for logical inconsistencies
+        if self._has_logical_inconsistencies(sentences):
+            return True
+            
+        return False
+    
+    def _has_excessive_repetition(self, response: str) -> bool:
+        """Check for excessive repetition in response"""
+        words = response.lower().split()
+        if len(words) < 10:
+            return False
+            
+        # Check for word repetition
+        word_counts = {}
+        for word in words:
+            if len(word) > 3:  # Only count meaningful words
+                word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # If any word appears more than the configured threshold, likely repetitive
+        total_meaningful_words = sum(word_counts.values())
+        if total_meaningful_words > 0:
+            max_word_ratio = max(word_counts.values()) / total_meaningful_words
+            if max_word_ratio > self.config.FALLBACK_REPETITION_MAX_WORD_RATIO:
+                return True
+        
+        # Check for phrase repetition (3+ word sequences)
+        words_lower = [w.lower() for w in words]
+        for i in range(len(words_lower) - 5):
+            phrase = ' '.join(words_lower[i:i+3])
+            # Check if this 3-word phrase appears again later
+            remaining_text = ' '.join(words_lower[i+3:])
+            if phrase in remaining_text:
+                return True
+        
+        # Check for immediate word repetition (word word word)
+        for i in range(len(words_lower) - 2):
+            if words_lower[i] == words_lower[i+1] == words_lower[i+2] and len(words_lower[i]) > self.config.FALLBACK_REPETITION_MIN_WORD_LENGTH:
+                # Ignore legitimate repetition like "Example 1: Example 2: Example 3:"
+                if not any(legitimate in words_lower[i] for legitimate in ['example', 'option', 'step', 'item', 'point']):
+                    return True
+                
+        return False
+    
+    def _has_broken_structure(self, sentences: list) -> bool:
+        """Check for broken sentence structure"""
+        for sentence in sentences:
+            if len(sentence.strip()) < 3:
+                continue
+                
+            # Check for incomplete sentences (very basic heuristic)
+            words = sentence.split()
+            if len(words) < 3:
+                continue
+                
+            # Check for sentences that end abruptly or don't make sense
+            if sentence.endswith((' the', ' a', ' an', ' and', ' or', ' but', ' with', ' for', ' to', ' of')):
+                return True
+                
+            # Check for sentences that start with conjunctions without proper context
+            first_word = words[0].lower()
+            if first_word in ['and', 'but', 'or', 'because', 'so', 'then'] and len(sentences) < 3:
+                return True
+                
+        return False
+    
+    def _has_logical_inconsistencies(self, sentences: list) -> bool:
+        """Check for basic logical inconsistencies"""
+        # Look for contradictory statements (basic approach)
+        contradiction_pairs = [
+            (['can', 'able', 'possible'], ['cannot', 'unable', 'impossible']),
+            (['is', 'are', 'does'], ['is not', 'are not', 'does not', "isn't", "aren't", "doesn't"]),
+            (['always', 'never'], ['sometimes', 'maybe', 'might']),
+            (['yes', 'true', 'correct'], ['no', 'false', 'incorrect', 'wrong'])
+        ]
+        
+        response_lower = ' '.join(sentences).lower()
+        for positive_terms, negative_terms in contradiction_pairs:
+            has_positive = any(term in response_lower for term in positive_terms)
+            has_negative = any(term in response_lower for term in negative_terms)
+            if has_positive and has_negative:
+                # This is a simple check - in reality, contradictions are context-dependent
+                # Only flag if it's a short response where contradictions are more likely to be real issues
+                if len(response_lower.split()) < 50:
+                    return True
+                    
         return False
 
     def _make_llm_request(self, client_type: str, question: str, context: Optional[str] = None, is_retry: bool = False) -> Optional[str]:
