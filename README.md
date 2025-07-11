@@ -4,22 +4,12 @@ An intelligent IRC/Discord bot that automatically saves shared links and provide
 
 ## Features
 
-- **Multi-Platform Support**: Works on both IRC and Discord
-- **Automatic Link Detection**: Monitors channels for links and saves them automatically
-- **Link Metadata**: Automatically fetches and stores link titles and descriptions  
-- **Smart Deduplication**: Avoids saving duplicate links
-- **Command Interface**: Traditional !commands for link management
-- **Natural Language**: Responds to natural mentions and direct messages
-- **LLM Integration**: Answers questions using locally hosted LLM (Ollama/OpenAI-compatible)
-- **Smart Response Validation**: Filters complex responses for platform-appropriate simple answers
-- **Intelligent Retry Logic**: Automatically retries empty LLM responses (configurable attempts)
-- **SSL Support**: Connects to IRC servers with SSL (including self-signed certificates)
-- **Memory System**: Maintains conversation context for better LLM responses
-- **Rate Limiting**: Prevents spam with configurable per-user and total request limits
-- **Performance Monitoring**: Tracks LLM response times and success rates
-- **Robust Logging**: Detailed connection and error logging without channel spam
-- **Privacy Protection**: Advanced privacy filter that anonymizes usernames and removes PII before sending context to LLMs
-- **Comprehensive Testing**: Clean test suite with full coverage of all functionality
+- **Multi-Platform**: Works on both IRC and Discord
+- **Smart Link Management**: Automatically detects, saves, and organizes shared links with metadata
+- **AI-Powered Conversations**: Natural language responses using local LLM with intelligent fallback to OpenAI
+- **Privacy Protection**: Advanced filtering that anonymizes usernames and removes PII before sending to LLMs
+- **Flexible Configuration**: Multiple LLM modes (local-only, OpenAI-only, or smart fallback)
+- **Performance Optimized**: Built-in caching, rate limiting, and monitoring
 
 ## Quick Start
 
@@ -100,132 +90,39 @@ The privacy filter is enabled by default and works transparently. For complete d
 
 ## Configuration
 
-Edit the `.env` file with your settings:
+Copy `.env.example` to `.env` and customize your settings:
 
-### IRC Settings
-- `IRC_SERVER` - IRC server address (default: irc.libera.chat)
-- `IRC_PORT` - IRC server port (default: 6667)  
-- `IRC_NICKNAME` - Bot's nickname
-- `IRC_CHANNEL` - Channel to join (include # prefix)
-- `IRC_PASSWORD` - Bot's password (if required)
-- `IRC_USE_SSL` - Enable SSL connection (true/false)
-- `IRC_SSL_VERIFY` - Verify SSL certificates (false for self-signed)
-
-### Discord Settings
-- `DISCORD_TOKEN` - Your Discord bot token (required for Discord bot)
-- `DISCORD_GUILD_ID` - Optional: Specific server ID to restrict bot to
-- `DISCORD_CHANNEL_ID` - Optional: Specific channel ID to restrict bot to
-
-### LLM Settings (for !ask command and mentions)
-
-The bot supports three different LLM modes for maximum flexibility:
-
-#### LLM Mode Configuration
-- `LLM_MODE` - Controls which AI service to use:
-  - `local_only` - Use only local AI (Ollama) 
-  - `openai_only` - Use only OpenAI API
-  - `fallback` - Try local AI first, fall back to OpenAI if local fails or gives poor response
-
-#### Local LLM Settings (Ollama)
-- `LLM_ENABLED` - Enable local LLM features (true/false)
-- `LLM_BASE_URL` - API endpoint (e.g., http://localhost:11434/v1 for Ollama)
-- `LLM_API_KEY` - API key (use "ollama" for local Ollama)
-- `LLM_MODEL` - Model name (e.g., deepseek-r1:latest)
-- `LLM_MAX_TOKENS` - Maximum response length (default: 150)
-- `LLM_TEMPERATURE` - Creativity level 0.0-1.0 (default: 0.7)
-- `LLM_RETRY_ATTEMPTS` - Number of retries for empty LLM responses (default: 3)
-
-#### OpenAI Settings
-
-**🔐 IMPORTANT: For security, set your OpenAI API key in your shell environment:**
 ```bash
-export OPENAI_API_KEY="sk-your-api-key-here"
+cp .env.example .env
+# Edit .env with your IRC/Discord server details and preferences
 ```
 
-The bot automatically detects and uses your environment `OPENAI_API_KEY`. No need to put it in config files!
+### Quick Configuration Examples
 
-- `OPENAI_ENABLED` - Enable OpenAI API features (auto-enabled when API key is found)
-- `OPENAI_MODEL` - OpenAI model to use (e.g., gpt-3.5-turbo, gpt-4)
-- `OPENAI_MAX_TOKENS` - Maximum response length for OpenAI (default: 150)
-- `OPENAI_TEMPERATURE` - Creativity level for OpenAI 0.0-1.0 (default: 0.7)
-- `OPENAI_DAILY_LIMIT` - Maximum OpenAI API calls per day for cost control (default: 100)
-
-#### Mode Examples
-
-**Local Only Mode** (default):
+**Local AI Only** (free, private):
 ```bash
 LLM_MODE=local_only
 LLM_ENABLED=true
-OPENAI_ENABLED=false
+LLM_BASE_URL=http://localhost:11434/v1
+LLM_MODEL=deepseek-r1:latest
 ```
 
-**OpenAI Only Mode**:
+**OpenAI Only** (reliable, paid):
 ```bash
 LLM_MODE=openai_only
-LLM_ENABLED=false
 OPENAI_ENABLED=true
-OPENAI_API_KEY=your_api_key_here
+export OPENAI_API_KEY="sk-your-api-key-here"
 ```
 
-**Fallback Mode** (best of both worlds):
+**Smart Fallback** (best of both worlds):
 ```bash
 LLM_MODE=fallback
 LLM_ENABLED=true
 OPENAI_ENABLED=true
-OPENAI_API_KEY=your_api_key_here
+SEMANTIC_SIMILARITY_ENABLED=true  # AI-powered response quality detection
 ```
 
-In fallback mode, the bot will:
-1. Try local AI first (faster, free, private)
-2. If local AI fails or gives a poor response (e.g., "I don't know"), automatically fall back to OpenAI
-3. Provides detailed logging so you can see which service handled each request
-
-### Personality Prompts (Optional)
-
-You can customize the bot's personality and response style by configuring a personality prompt:
-
-- `PERSONALITY_ENABLED` - Enable custom personality prompts (default: false)
-- `PERSONALITY_PROMPT_FILE` - Path to personality prompt file (default: personality_prompt.txt)
-
-**Example Usage:**
-```bash
-# Enable personality prompts
-export PERSONALITY_ENABLED=true
-export PERSONALITY_PROMPT_FILE=personality_prompt.txt
-
-# Create personality file
-echo "Respond in an impersonal and snarky manner to these questions. Don't worry about hurting the asker's feelings." > personality_prompt.txt
-```
-
-**Important Notes:**
-- If `PERSONALITY_ENABLED=true`, the specified file **must exist** and contain content
-- The personality prompt replaces the default friendly behavior
-- The bot will still identify as its configured nickname
-- Personality prompts work with all LLM modes (local, OpenAI, fallback)
-
-See `personality_prompt.txt.example` for a sample personality configuration.
-
-### Database
-- `DATABASE_PATH` - Path to SQLite database file
-
-### Rate Limiting  
-- `RATE_LIMIT_USER_PER_MINUTE` - Max requests per user per minute (default: 1)
-- `RATE_LIMIT_TOTAL_PER_MINUTE` - Max total requests per minute (default: 10)
-
-### Link Display Limits
-- `LINKS_RECENT_LIMIT` - Number of links shown by `!links` command (default: 5)
-- `LINKS_SEARCH_LIMIT` - Number of links shown by `!links search` command (default: 3)
-- `LINKS_DETAILS_LIMIT` - Number of links shown by `!links details` command (default: 5)
-- `LINKS_BY_USER_LIMIT` - Number of links shown by `!links by <user>` command (default: 3)
-
-### Privacy Protection
-- `PRIVACY_FILTER_ENABLED` - Enable privacy filtering for LLM context (default: true)
-- `PRIVACY_CHANNEL_SIZE_THRESHOLD` - Max channel size for full privacy filtering (default: 50)
-- `PRIVACY_PRESERVE_COMMON_WORDS` - Preserve common words when anonymizing (default: true)
-- `PRIVACY_USERNAME_PREFIX` - Prefix for anonymized usernames (default: "user_")
-
-### Administrative Settings
-- `ADMIN_USERS` - Comma-separated list of admin usernames who can use admin commands (default: bot nickname)
+📖 **For complete configuration options, see [Configuration Guide](docs/CONFIGURATION.md)**
 
 ## Commands
 
@@ -293,210 +190,46 @@ The bot creates these tables:
 
 ## Architecture
 
-### Code Structure
+AircBot is built with a modular architecture:
 
-```mermaid
-graph TD
-    A[bot.py - IRC Bot] --> B[Config]
-    C[simple_discord_bot.py - Discord Bot] --> B
-    
-    A --> D[Database]
-    C --> D
-    
-    A --> E[LinkHandler]
-    C --> E
-    
-    A --> F[LLMHandler]
-    C --> F
-    
-    A --> G[RateLimiter]
-    C --> G
-    
-    A --> H[ContextManager]
-    C --> H
-    
-    A --> I[ContentFilter]
-    C --> I
-    
-    A --> Q[PrivacyFilter]
-    C --> Q
-    
-    F --> J[OpenAI Client]
-    F --> K[Local LLM Client]
-    F --> L[OpenAIRateLimiter]
-    
-    H --> Q
-    Q --> D
-    
-    B --> M[Environment Variables]
-    D --> N[SQLite Database]
-    E --> O[Web Scraping]
-    
-    P[Prompts] --> F
-    P --> H
-    
-    style A fill:#e1f5fe
-    style C fill:#e8f5e8
-    style B fill:#fff3e0
-    style D fill:#fce4ec
-    style F fill:#f3e5f5
-    style Q fill:#f1f8e9
-    style B fill:#fff3e0
-    style D fill:#fce4ec
-    style F fill:#f3e5f5
-```
+### Core Components
+- **Bot Platforms**: `bot.py` (IRC), `simple_discord_bot.py` (Discord)
+- **AI Integration**: `llm_handler.py` with smart fallback logic and semantic similarity
+- **Link Management**: `link_handler.py` for URL detection and metadata
+- **Privacy Protection**: `privacy_filter.py` with PII detection and anonymization
+- **Database**: `database.py` with SQLite for persistence
+- **Configuration**: `config.py` with comprehensive validation
 
-### Interaction Flow
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant P as Platform (IRC/Discord)
-    participant B as Bot
-    participant RL as RateLimiter
-    participant CF as ContentFilter
-    participant LH as LinkHandler
-    participant LLM as LLMHandler
-    participant DB as Database
-    participant CM as ContextManager
-
-    Note over U,CM: Message Processing Flow
-    
-    U->>P: Sends message with link or command
-    P->>B: Message event received
-    
-    B->>CM: Add message to context
-    B->>DB: Save message (if enabled)
-    
-    alt Message contains command (!ask, !links, etc.)
-        B->>RL: Check rate limit
-        alt Rate limit OK
-            RL-->>B: Allowed
-            alt Command is !ask
-                B->>CF: Filter content
-                CF-->>B: Content approved
-                B->>CM: Get relevant context
-                CM-->>B: Context messages
-                B->>LLM: Ask question with context
-                LLM->>LLM: Try local LLM first
-                alt Local LLM fails (fallback mode)
-                    LLM->>LLM: Try OpenAI
-                end
-                LLM-->>B: Response
-                B->>P: Send AI response
-            else Command is !links
-                B->>DB: Query links
-                DB-->>B: Link results
-                B->>P: Send formatted links
-            end
-        else Rate limited
-            RL-->>B: Denied
-            B->>P: Send rate limit message
-        end
-    else Message contains @mention (Discord) or bot name (IRC)
-        B->>RL: Check rate limit
-        RL-->>B: Allowed
-        B->>CF: Filter content
-        CF-->>B: Content approved
-        B->>LLM: Process as question
-        LLM-->>B: Response
-        B->>P: Send AI response
-    end
-    
-    alt Message contains URLs
-        B->>LH: Extract URLs
-        LH->>LH: Fetch metadata
-        LH-->>B: Title & description
-        B->>DB: Save link
-        DB-->>B: Saved successfully
-        B->>P: Confirm link saved
-    end
-
-    Note over U,CM: All interactions logged and stored
-```
+### Key Features
+- **Smart Fallback**: Tries local AI first, falls back to OpenAI if response quality is poor
+- **Semantic Similarity**: AI-powered response quality evaluation beyond keyword matching
+- **Privacy First**: Automatic PII filtering and username anonymization
+- **Performance Optimized**: Built-in caching, rate limiting, and monitoring
 
 ## Development
 
-The bot is structured in modular components:
-
-### Core Components
-- `bot.py` - Main IRC bot logic with natural language processing
-- `simple_discord_bot.py` - Discord bot implementation using discord.py
-- `database.py` - Database operations and schema management
-- `link_handler.py` - URL detection and metadata fetching  
-- `llm_handler.py` - LLM integration with validation and retry logic
-- `privacy_filter.py` - Privacy protection and user anonymization
-- `context_manager.py` - Conversation context management with privacy integration
-- `rate_limiter.py` - Rate limiting functionality
-- `config.py` - Configuration management
-- `prompts.py` - LLM prompts and response templates
-
 ### Testing
 
-The project has a clean, comprehensive test suite organized into focused files:
+Run the comprehensive test suite to validate functionality:
 
 ```bash
-# Main integration and flow tests
-python test_suite.py
+# Run complete test suite (recommended)
+./run_tests.sh
+
+# Run specific test categories
+python tests/test_fallback_logic.py        # Fallback logic tests
+python tests/test_semantic_similarity.py   # Semantic similarity tests
+python tests/test_privacy_filter.py       # Privacy filter tests
+python demo.py                            # Interactive demonstration
 ```
-- Bot name mention detection
-- Link request parsing
-- Rate limiter functionality  
-- Bot integration tests
-- LLM response validation
-- Simple list questions (geography, colors, etc.)
-- Complete end-to-end workflows
-- Content filtering and OpenAI integration
 
-```bash  
-# LLM validation and response processing tests
-python test_validation.py
-```
-- Think tag removal from responses
-- Response length validation
-- Sentence counting logic
-- Complex vs simple response detection
-- Whitespace handling
-- Retry logic for empty responses
-- Validation failure handling
+### Contributing
 
-```bash
-# Performance and timing tests
-python test_performance.py [--real-llm]
-```
-- LLM performance statistics tracking
-- Response time measurements
-- Bot integration timing
-- Real LLM timing tests (with --real-llm flag)
-
-```bash
-# Privacy filter unit tests
-python test_privacy_filter.py
-```
-- Username anonymization testing
-- PII detection and replacement
-- Conversation flow preservation
-- Performance optimization validation
-- Context manager integration
-
-```bash
-# Interactive demonstration
-python demo.py
-```
-- Privacy filtering demonstrations
-- Admin authorization examples
-- Performance optimization showcase
-- Context integration examples
-
-### Test Architecture
-
-The test suite has been carefully consolidated for maintainability:
-- **Previous**: 15+ scattered test files (test_*.py, debug_*.py, multiple demos)
-- **Current**: 4 focused test files + 1 interactive demo
-- **Coverage**: All functionality preserved with zero redundancy
-- **Organization**: Each file has a clear, distinct purpose
-
-This clean structure makes the codebase easier to maintain while ensuring complete test coverage of all bot functionality.
+The codebase follows a clean, modular architecture:
+- Each component has a single responsibility
+- Comprehensive test coverage for all features
+- Clear separation between IRC/Discord platforms and core logic
+- Well-documented configuration options
 
 ## Example Usage
 
