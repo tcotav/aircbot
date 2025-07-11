@@ -15,7 +15,7 @@ fi
 
 # Run the consolidated test suite
 echo "📋 Running consolidated test suite..."
-python -m pytest test_consolidated.py -v
+python -m pytest tests/test_consolidated.py -v
 
 # Check test result
 if [ $? -eq 0 ]; then
@@ -38,4 +38,4 @@ else
 fi
 
 echo
-echo "📝 For more details, see test_consolidation_report.md"
+echo "📝 For more details, see tests/test_consolidation_report.md"

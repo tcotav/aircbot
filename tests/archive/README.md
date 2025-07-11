@@ -1,6 +1,6 @@
 # Archived Test Files
 
-This directory contains the original test files that were consolidated into `test_consolidated.py` on July 2, 2025.
+This directory contains the original test files that were consolidated into `tests/test_consolidated.py` on July 2, 2025.
 
 ## Archived Files
 
@@ -71,6 +71,6 @@ This directory contains the original test files that were consolidated into `tes
 
 ## If You Need to Reference These Files
 
-These files are preserved for historical reference. However, the consolidated test suite (`test_consolidated.py`) should be used for all current testing needs.
+These files are preserved for historical reference. However, the consolidated test suite (`tests/test_consolidated.py`) should be used for all current testing needs.
 
-For questions about the consolidation process, see `test_consolidation_report.md` in the project root.
+For questions about the consolidation process, see `tests/test_consolidation_report.md`.

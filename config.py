@@ -105,6 +105,71 @@ class Config:
     # Path to personality prompt file
     PERSONALITY_PROMPT_FILE = os.getenv('PERSONALITY_PROMPT_FILE', 'personality_prompt.txt')
     
+    # LLM Fallback Configuration
+    # These settings control when the bot falls back from local LLM to OpenAI
+    
+    # Minimum response length before considering fallback (characters)
+    FALLBACK_MIN_RESPONSE_LENGTH = int(os.getenv('FALLBACK_MIN_RESPONSE_LENGTH', '3'))
+    
+    # Minimum response length for "I don't know" context check (words)
+    FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS = int(os.getenv('FALLBACK_DONT_KNOW_CONTEXT_MIN_WORDS', '15'))
+    
+    # Relevance scoring thresholds
+    FALLBACK_RELEVANCE_MIN_RATIO = float(os.getenv('FALLBACK_RELEVANCE_MIN_RATIO', '0.05'))
+    FALLBACK_RELEVANCE_MIN_QUESTION_WORDS = int(os.getenv('FALLBACK_RELEVANCE_MIN_QUESTION_WORDS', '3'))
+    
+    # Question type mismatch thresholds
+    FALLBACK_TYPE_MISMATCH_MIN_RATIO = float(os.getenv('FALLBACK_TYPE_MISMATCH_MIN_RATIO', '0.1'))
+    FALLBACK_TYPE_MISMATCH_MIN_QUESTION_WORDS = int(os.getenv('FALLBACK_TYPE_MISMATCH_MIN_QUESTION_WORDS', '5'))
+    
+    # Generic response detection threshold (words)
+    FALLBACK_GENERIC_RESPONSE_MAX_WORDS = int(os.getenv('FALLBACK_GENERIC_RESPONSE_MAX_WORDS', '25'))
+    
+    # Repetition detection thresholds
+    FALLBACK_REPETITION_MAX_WORD_RATIO = float(os.getenv('FALLBACK_REPETITION_MAX_WORD_RATIO', '0.3'))
+    FALLBACK_REPETITION_MIN_WORD_LENGTH = int(os.getenv('FALLBACK_REPETITION_MIN_WORD_LENGTH', '3'))
+    
+    # Explanation response minimum word count
+    FALLBACK_EXPLANATION_MIN_WORDS = int(os.getenv('FALLBACK_EXPLANATION_MIN_WORDS', '8'))
+    
+    # Procedural response minimum word count for short answer bypass
+    FALLBACK_PROCEDURAL_SHORT_ANSWER_MAX_WORDS = int(os.getenv('FALLBACK_PROCEDURAL_SHORT_ANSWER_MAX_WORDS', '15'))
+    
+    # Code response minimum word count for short answer bypass
+    FALLBACK_CODE_SHORT_ANSWER_MAX_WORDS = int(os.getenv('FALLBACK_CODE_SHORT_ANSWER_MAX_WORDS', '10'))
+    
+    # Semantic Similarity Configuration
+    # Enable semantic similarity scoring for fallback decisions
+    SEMANTIC_SIMILARITY_ENABLED = os.getenv('SEMANTIC_SIMILARITY_ENABLED', 'false').lower() == 'true'
+    
+    # Semantic similarity thresholds
+    SEMANTIC_SIMILARITY_MIN_THRESHOLD = float(os.getenv('SEMANTIC_SIMILARITY_MIN_THRESHOLD', '0.3'))
+    SEMANTIC_SIMILARITY_WEIGHT = float(os.getenv('SEMANTIC_SIMILARITY_WEIGHT', '0.4'))  # Weight in combined scoring
+    
+    # Model configuration for semantic similarity
+    SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME', 'all-MiniLM-L6-v2')  # Lightweight model
+    SEMANTIC_MODEL_DEVICE = os.getenv('SEMANTIC_MODEL_DEVICE', 'cpu')  # 'cpu' or 'cuda'
+    SEMANTIC_CACHE_SIZE = int(os.getenv('SEMANTIC_CACHE_SIZE', '100'))  # Cache embeddings
+    
+    # Context-aware semantic scoring
+    SEMANTIC_CONTEXT_ENABLED = os.getenv('SEMANTIC_CONTEXT_ENABLED', 'true').lower() == 'true'
+    SEMANTIC_CONTEXT_WEIGHT = float(os.getenv('SEMANTIC_CONTEXT_WEIGHT', '0.2'))  # Weight for context matching
+    
+    # Entity/keyword boosting
+    SEMANTIC_ENTITY_BOOST = float(os.getenv('SEMANTIC_ENTITY_BOOST', '1.2'))  # Boost for technical terms
+    SEMANTIC_TECHNICAL_KEYWORDS = [kw.strip() for kw in os.getenv('SEMANTIC_TECHNICAL_KEYWORDS', 'code,function,class,api,database,server,config,install,debug,error,fix,implement,create,build,deploy,test,python,javascript,sql,git,docker,linux,windows,network,security,performance').split(',')]
+    
+    # Validate semantic similarity configuration
+    if SEMANTIC_SIMILARITY_ENABLED:
+        if not (0.0 <= SEMANTIC_SIMILARITY_MIN_THRESHOLD <= 1.0):
+            raise ValueError(f"SEMANTIC_SIMILARITY_MIN_THRESHOLD must be between 0.0 and 1.0, got {SEMANTIC_SIMILARITY_MIN_THRESHOLD}")
+        if not (0.0 <= SEMANTIC_SIMILARITY_WEIGHT <= 1.0):
+            raise ValueError(f"SEMANTIC_SIMILARITY_WEIGHT must be between 0.0 and 1.0, got {SEMANTIC_SIMILARITY_WEIGHT}")
+        if not (0.0 <= SEMANTIC_CONTEXT_WEIGHT <= 1.0):
+            raise ValueError(f"SEMANTIC_CONTEXT_WEIGHT must be between 0.0 and 1.0, got {SEMANTIC_CONTEXT_WEIGHT}")
+        if SEMANTIC_CACHE_SIZE < 0:
+            raise ValueError(f"SEMANTIC_CACHE_SIZE must be non-negative, got {SEMANTIC_CACHE_SIZE}")
+    
     # Validate personality configuration
     if PERSONALITY_ENABLED:
         if not os.path.exists(PERSONALITY_PROMPT_FILE):

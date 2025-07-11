@@ -260,7 +260,7 @@ def main():
         print("• Performance optimization for large channels")
         print()
         print("📚 For more details, see:")
-        print("• PRIVACY_FILTER_GUIDE.md - Complete privacy documentation")
+        print("• docs/PRIVACY_FILTER_GUIDE.md - Complete privacy documentation")
         print("• python test_privacy_filter.py - Comprehensive unit tests")
         print("• python test_suite.py - Full integration tests")
         
