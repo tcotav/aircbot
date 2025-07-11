@@ -138,6 +138,38 @@ class Config:
     # Code response minimum word count for short answer bypass
     FALLBACK_CODE_SHORT_ANSWER_MAX_WORDS = int(os.getenv('FALLBACK_CODE_SHORT_ANSWER_MAX_WORDS', '10'))
     
+    # Semantic Similarity Configuration
+    # Enable semantic similarity scoring for fallback decisions
+    SEMANTIC_SIMILARITY_ENABLED = os.getenv('SEMANTIC_SIMILARITY_ENABLED', 'false').lower() == 'true'
+    
+    # Semantic similarity thresholds
+    SEMANTIC_SIMILARITY_MIN_THRESHOLD = float(os.getenv('SEMANTIC_SIMILARITY_MIN_THRESHOLD', '0.3'))
+    SEMANTIC_SIMILARITY_WEIGHT = float(os.getenv('SEMANTIC_SIMILARITY_WEIGHT', '0.4'))  # Weight in combined scoring
+    
+    # Model configuration for semantic similarity
+    SEMANTIC_MODEL_NAME = os.getenv('SEMANTIC_MODEL_NAME', 'all-MiniLM-L6-v2')  # Lightweight model
+    SEMANTIC_MODEL_DEVICE = os.getenv('SEMANTIC_MODEL_DEVICE', 'cpu')  # 'cpu' or 'cuda'
+    SEMANTIC_CACHE_SIZE = int(os.getenv('SEMANTIC_CACHE_SIZE', '100'))  # Cache embeddings
+    
+    # Context-aware semantic scoring
+    SEMANTIC_CONTEXT_ENABLED = os.getenv('SEMANTIC_CONTEXT_ENABLED', 'true').lower() == 'true'
+    SEMANTIC_CONTEXT_WEIGHT = float(os.getenv('SEMANTIC_CONTEXT_WEIGHT', '0.2'))  # Weight for context matching
+    
+    # Entity/keyword boosting
+    SEMANTIC_ENTITY_BOOST = float(os.getenv('SEMANTIC_ENTITY_BOOST', '1.2'))  # Boost for technical terms
+    SEMANTIC_TECHNICAL_KEYWORDS = [kw.strip() for kw in os.getenv('SEMANTIC_TECHNICAL_KEYWORDS', 'code,function,class,api,database,server,config,install,debug,error,fix,implement,create,build,deploy,test,python,javascript,sql,git,docker,linux,windows,network,security,performance').split(',')]
+    
+    # Validate semantic similarity configuration
+    if SEMANTIC_SIMILARITY_ENABLED:
+        if not (0.0 <= SEMANTIC_SIMILARITY_MIN_THRESHOLD <= 1.0):
+            raise ValueError(f"SEMANTIC_SIMILARITY_MIN_THRESHOLD must be between 0.0 and 1.0, got {SEMANTIC_SIMILARITY_MIN_THRESHOLD}")
+        if not (0.0 <= SEMANTIC_SIMILARITY_WEIGHT <= 1.0):
+            raise ValueError(f"SEMANTIC_SIMILARITY_WEIGHT must be between 0.0 and 1.0, got {SEMANTIC_SIMILARITY_WEIGHT}")
+        if not (0.0 <= SEMANTIC_CONTEXT_WEIGHT <= 1.0):
+            raise ValueError(f"SEMANTIC_CONTEXT_WEIGHT must be between 0.0 and 1.0, got {SEMANTIC_CONTEXT_WEIGHT}")
+        if SEMANTIC_CACHE_SIZE < 0:
+            raise ValueError(f"SEMANTIC_CACHE_SIZE must be non-negative, got {SEMANTIC_CACHE_SIZE}")
+    
     # Validate personality configuration
     if PERSONALITY_ENABLED:
         if not os.path.exists(PERSONALITY_PROMPT_FILE):

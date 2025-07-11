@@ -7,6 +7,7 @@ from threading import Thread
 import time
 from prompts import get_system_prompt, get_error_message, get_name_response
 from openai_rate_limiter import OpenAIRateLimiter
+from semantic_similarity import SemanticSimilarityScorer
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +23,14 @@ class LLMHandler:
         # OpenAI rate limiter
         self.openai_rate_limiter = None
         
+        # Semantic similarity scorer
+        self.semantic_scorer = SemanticSimilarityScorer(config)
+        
         # Performance tracking
         self.response_times = {'local': [], 'openai': []}
         self.total_requests = {'local': 0, 'openai': 0}
         self.failed_requests = {'local': 0, 'openai': 0}
+        self.semantic_fallbacks = 0  # Track fallbacks due to semantic similarity
         
         # Initialize clients based on mode and configuration
         self._initialize_clients()
@@ -223,7 +228,7 @@ class LLMHandler:
             local_result = self._ask_local(question, context)
             
             # Check if local response is good enough
-            if local_result and not self._is_fallback_response(local_result, question):
+            if local_result and not self._is_fallback_response(local_result, question, context):
                 logger.info("Local LLM provided satisfactory response")
                 return local_result
             else:
@@ -240,13 +245,14 @@ class LLMHandler:
         else:
             return get_error_message('llm_unavailable')
     
-    def _is_fallback_response(self, response: str, question: str = None) -> bool:
+    def _is_fallback_response(self, response: str, question: str = None, context: Optional[str] = None) -> bool:
         """
         Determine if a response from local LLM warrants falling back to OpenAI
         
         Args:
             response: The response from local LLM
             question: The original question (optional, for relevance scoring)
+            context: Optional conversation context for semantic analysis
             
         Returns:
             True if we should fall back to OpenAI, False if response is adequate
@@ -299,7 +305,14 @@ class LLMHandler:
         if self._has_poor_semantic_coherence(response):
             return True
             
-        # Check relevance if question is provided and not empty
+        # Semantic similarity check (if enabled)
+        if self.config.SEMANTIC_SIMILARITY_ENABLED and self.semantic_scorer.is_available():
+            if self.semantic_scorer.should_fallback(question, response, context):
+                logger.info(f"Semantic similarity triggered fallback for question: '{question[:50]}...'")
+                self.semantic_fallbacks += 1
+                return True
+        
+        # Check relevance if question is provided and not empty (traditional keyword-based approach)
         if question and question.strip() and not self._is_response_relevant(question, response):
             return True
             
@@ -685,8 +698,13 @@ class LLMHandler:
         stats['mode'] = self.mode
         stats['overall'] = {
             'total_requests': sum(self.total_requests.values()),
-            'total_failed': sum(self.failed_requests.values())
+            'total_failed': sum(self.failed_requests.values()),
+            'semantic_fallbacks': self.semantic_fallbacks
         }
+        
+        # Add semantic similarity statistics
+        if self.config.SEMANTIC_SIMILARITY_ENABLED:
+            stats['semantic_similarity'] = self.semantic_scorer.get_stats()
         
         return stats
     
