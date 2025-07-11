@@ -5,6 +5,7 @@ import numpy as np
 from functools import lru_cache
 import threading
 import re
+from collections import OrderedDict
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +18,12 @@ class SemanticSimilarityScorer:
     def __init__(self, config):
         self.config = config
         self.model = None
-        self.embedding_cache = {}
+        self.embedding_cache = OrderedDict()  # Use OrderedDict for LRU behavior
         self.cache_lock = threading.Lock()
         self.model_loaded = False
         self.load_error = None
+        self.cache_hits = 0
+        self.cache_misses = 0
         
         # Only initialize if semantic similarity is enabled
         if config.SEMANTIC_SIMILARITY_ENABLED:
@@ -75,15 +78,24 @@ class SemanticSimilarityScorer:
         if use_cache:
             with self.cache_lock:
                 if text_key in self.embedding_cache:
+                    # Move to end (most recently used)
+                    self.embedding_cache.move_to_end(text_key)
+                    self.cache_hits += 1
                     return self.embedding_cache[text_key]
         
         try:
             # Generate embedding
             embedding = self.model.encode([text], convert_to_numpy=True)[0]
+            self.cache_misses += 1
             
-            # Cache if enabled and within limits
-            if use_cache and len(self.embedding_cache) < self.config.SEMANTIC_CACHE_SIZE:
+            # Cache if enabled with LRU eviction
+            if use_cache:
                 with self.cache_lock:
+                    # If at capacity, remove oldest (least recently used) item
+                    if len(self.embedding_cache) >= self.config.SEMANTIC_CACHE_SIZE:
+                        self.embedding_cache.popitem(last=False)  # Remove first (oldest) item
+                    
+                    # Add new embedding (will be at the end, most recently used)
                     self.embedding_cache[text_key] = embedding
             
             return embedding
@@ -257,6 +269,10 @@ class SemanticSimilarityScorer:
         with self.cache_lock:
             cache_size = len(self.embedding_cache)
         
+        # Calculate cache hit rate
+        total_requests = self.cache_hits + self.cache_misses
+        hit_rate = (self.cache_hits / total_requests * 100) if total_requests > 0 else 0.0
+        
         return {
             'available': self.is_available(),
             'model_loaded': self.model_loaded,
@@ -264,11 +280,16 @@ class SemanticSimilarityScorer:
             'device': self.config.SEMANTIC_MODEL_DEVICE,
             'cache_size': cache_size,
             'cache_limit': self.config.SEMANTIC_CACHE_SIZE,
+            'cache_hits': self.cache_hits,
+            'cache_misses': self.cache_misses,
+            'cache_hit_rate': f"{hit_rate:.1f}%",
             'load_error': self.load_error
         }
     
     def clear_cache(self):
-        """Clear the embedding cache"""
+        """Clear the embedding cache and reset statistics"""
         with self.cache_lock:
             self.embedding_cache.clear()
+            self.cache_hits = 0
+            self.cache_misses = 0
         logger.info("Semantic similarity embedding cache cleared")

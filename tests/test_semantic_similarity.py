@@ -152,6 +152,52 @@ class TestSemanticSimilarityScorer(unittest.TestCase):
         # Should be the same object from cache
         import numpy as np
         np.testing.assert_array_equal(embedding1, embedding2)
+        
+        # Check cache statistics
+        stats = self.scorer.get_stats()
+        self.assertGreater(stats['cache_hits'], 0)
+        self.assertGreater(stats['cache_misses'], 0)
+    
+    def test_cache_lru_eviction(self):
+        """Test LRU cache eviction behavior"""
+        if not self.scorer.is_available():
+            self.skipTest("sentence-transformers not available")
+        
+        # Use a small cache size for testing
+        original_cache_size = self.scorer.config.SEMANTIC_CACHE_SIZE
+        self.scorer.config.SEMANTIC_CACHE_SIZE = 3
+        
+        try:
+            # Clear cache first
+            self.scorer.clear_cache()
+            
+            # Fill cache to capacity
+            texts = ["text one", "text two", "text three"]
+            for text in texts:
+                self.scorer.get_embedding(text)
+            
+            # Cache should be full
+            self.assertEqual(len(self.scorer.embedding_cache), 3)
+            
+            # Add one more item - should evict oldest
+            self.scorer.get_embedding("text four")
+            self.assertEqual(len(self.scorer.embedding_cache), 3)
+            
+            # First item should be evicted
+            self.assertNotIn("text one", self.scorer.embedding_cache)
+            self.assertIn("text four", self.scorer.embedding_cache)
+            
+            # Access second item to make it recently used
+            self.scorer.get_embedding("text two")
+            
+            # Add another item - should evict "text three" (oldest unused)
+            self.scorer.get_embedding("text five")
+            self.assertNotIn("text three", self.scorer.embedding_cache)
+            self.assertIn("text two", self.scorer.embedding_cache)  # Should still be there
+            
+        finally:
+            # Restore original cache size
+            self.scorer.config.SEMANTIC_CACHE_SIZE = original_cache_size
     
     def test_stats_collection(self):
         """Test statistics collection"""
