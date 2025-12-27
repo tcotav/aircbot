@@ -21,6 +21,10 @@ class Config:
     # SSL Settings
     IRC_USE_SSL = os.getenv('IRC_USE_SSL', 'false').lower() == 'true'
     IRC_SSL_VERIFY = os.getenv('IRC_SSL_VERIFY', 'true').lower() == 'true'
+
+    # Connection keepalive settings
+    IRC_KEEPALIVE_ENABLED = os.getenv('IRC_KEEPALIVE_ENABLED', 'true').lower() == 'true'
+    IRC_KEEPALIVE_INTERVAL = int(os.getenv('IRC_KEEPALIVE_INTERVAL', '60'))  # Send PING every N seconds
     
     # LLM Settings (for Ollama with OpenAI-compatible API)
     LLM_ENABLED = os.getenv('LLM_ENABLED', 'false').lower() == 'true'

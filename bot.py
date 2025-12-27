@@ -71,7 +71,12 @@ class AircBot(irc.bot.SingleServerIRCBot):
     def on_welcome(self, connection, event):
         """Called when we successfully connect to the IRC server"""
         logger.info("Connected to IRC server")
-        
+
+        # Enable keepalive to prevent connection timeout
+        if self.config.IRC_KEEPALIVE_ENABLED:
+            connection.set_keepalive(self.config.IRC_KEEPALIVE_INTERVAL)
+            logger.info(f"Keepalive enabled: PING every {self.config.IRC_KEEPALIVE_INTERVAL} seconds")
+
         # Join the configured channel
         connection.join(self.config.IRC_CHANNEL)
         logger.info(f"Joining channel {self.config.IRC_CHANNEL}")
@@ -509,6 +514,10 @@ class AircBot(irc.bot.SingleServerIRCBot):
         logger.warning(f"Event arguments: {event.arguments}")
         if hasattr(event, 'error'):
             logger.error(f"Disconnect error: {event.error}")
+
+        # Log reconnection info
+        logger.info("Automatic reconnection will be handled by the IRC library (exponential backoff: 60s-300s)")
+        logger.info(f"Keepalive was {'enabled' if self.config.IRC_KEEPALIVE_ENABLED else 'disabled'} (interval: {self.config.IRC_KEEPALIVE_INTERVAL}s)")
     
     def on_error(self, connection, event):
         """Called when an error occurs"""
