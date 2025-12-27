@@ -24,4 +24,4 @@ if [ ! -f ".env" ]; then
 fi
 
 echo "Starting bot..."
-python bot.py
+python3 bot.py

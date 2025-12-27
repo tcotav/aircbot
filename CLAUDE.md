@@ -91,6 +91,36 @@ get_system_prompt         # Find system prompt usage
 3. Update relevant handlers to use new config
 4. Test with example configurations
 
+## IRC Connection Keepalive
+
+The bot includes automatic keepalive functionality to prevent IRC connection timeouts and disconnections.
+
+### How It Works:
+- The bot sends PING messages to the IRC server at regular intervals
+- This keeps the connection alive even during periods of channel inactivity
+- Uses the IRC library's built-in `set_keepalive()` mechanism
+- Automatic reconnection is handled by the library (exponential backoff: 60s-300s)
+
+### Configuration:
+```bash
+# Enable/disable keepalive (default: enabled)
+export IRC_KEEPALIVE_ENABLED=true
+
+# Set keepalive interval in seconds (default: 60)
+export IRC_KEEPALIVE_INTERVAL=60
+```
+
+### Troubleshooting Disconnections:
+1. **Check keepalive is enabled**: Look for "Keepalive enabled: PING every N seconds" in logs
+2. **Adjust interval**: Try different intervals (30-120 seconds recommended)
+3. **Check server timeout**: Some IRC servers have specific timeout requirements
+4. **Monitor logs**: Disconnect events include full event details for debugging
+
+### Files Modified:
+- `config.py` - Added IRC_KEEPALIVE_ENABLED and IRC_KEEPALIVE_INTERVAL settings
+- `bot.py` - Implemented keepalive in on_welcome() handler
+- `bot.py` - Enhanced on_disconnect() logging for better visibility
+
 ## Feature Development Example - Personality Prompts
 
 ### Files Modified:
@@ -260,6 +290,10 @@ See `docs/FALLBACK_CONFIGURATION.md` for detailed explanation of all settings.
 export IRC_SERVER=irc.libera.chat
 export IRC_NICKNAME=aircbot
 export IRC_CHANNEL=#yourchannel
+
+# IRC connection keepalive (prevent timeout disconnects)
+export IRC_KEEPALIVE_ENABLED=true   # Enable keepalive PING messages
+export IRC_KEEPALIVE_INTERVAL=60    # Send PING every N seconds (default: 60)
 
 # LLM settings
 export LLM_ENABLED=true
